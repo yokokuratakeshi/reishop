@@ -1,0 +1,11 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /products/{productId}/{allPaths=**} {
+      // 全ての認証済みユーザーは画像の読み取りが可能
+      allow read: if request.auth != null;
+      // 管理者のみが画像のアップロード・削除が可能
+      allow write: if request.auth != null && request.auth.token.role == 'admin';
+    }
+  }
+}

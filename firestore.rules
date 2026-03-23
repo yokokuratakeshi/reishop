@@ -1,0 +1,72 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ユーティリティ関数
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.role == 'admin';
+    }
+    
+    function isFranchise() {
+      return isSignedIn() && request.auth.token.role == 'franchise';
+    }
+    
+    function isOwnFranchise(franchiseId) {
+      return isFranchise() && request.auth.token.franchise_id == franchiseId;
+    }
+
+    // マスタデータ
+    match /stages/{document} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    
+    match /categories/{document} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    
+    match /products/{document} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+      
+      match /variants/{vDoc} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin();
+        
+        match /prices/{pDoc} {
+          allow read: if isSignedIn();
+          allow write: if isAdmin();
+        }
+      }
+    }
+
+    // ユーザー・店舗情報
+    match /franchises/{franchiseId} {
+      allow read: if isAdmin() || isOwnFranchise(franchiseId);
+      allow write: if isAdmin();
+    }
+    
+    match /users/{userId} {
+      allow read: if isAdmin() || request.auth.uid == userId;
+      allow write: if isAdmin();
+    }
+
+    // 受注データ
+    match /orders/{orderId} {
+      allow read: if isAdmin() || isOwnFranchise(resource.data.franchise_id);
+      allow create: if isAdmin() || (isFranchise() && request.resource.data.franchise_id == request.auth.token.franchise_id);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // 請求データ
+    match /invoices/{invoiceId} {
+      allow read: if isAdmin() || isOwnFranchise(resource.data.franchise_id);
+      allow write: if isAdmin();
+    }
+  }
+}
