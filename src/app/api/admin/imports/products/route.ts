@@ -40,9 +40,37 @@ export async function POST(request: NextRequest) {
     // 商品名でグループ化（バリアントをまとめるため）
     const productGroups: Record<string, any[]> = {};
     body.forEach(row => {
-      const name = row.name || "Unknown";
+      // 日本語ヘッダーのマッピング
+      const mappedRow: any = { ...row };
+      const mappings: Record<string, string> = {
+        "商品名": "name",
+        "カテゴリー": "category",
+        "カテゴリ": "category",
+        "種別": "product_type",
+        "商品タイプ": "product_type",
+        "定価": "retail_price",
+        "小売価格": "retail_price",
+        "SKUコード": "sku_code",
+        "属性1名": "attr1_name",
+        "属性1値": "attr1_val",
+        "属性2名": "attr2_name",
+        "属性2値": "attr2_val"
+      };
+
+      Object.entries(mappings).forEach(([jp, en]) => {
+        if (row[jp] !== undefined && row[en] === undefined) {
+          mappedRow[en] = row[jp];
+        }
+      });
+
+      // 商品タイプの日本語変換
+      if (mappedRow.product_type === "アパレル") mappedRow.product_type = "apparel";
+      if (mappedRow.product_type === "アクセサリー") mappedRow.product_type = "accessory";
+      if (mappedRow.product_type === "非アパレル") mappedRow.product_type = "non_apparel";
+
+      const name = mappedRow.name || "Unknown";
       if (!productGroups[name]) productGroups[name] = [];
-      productGroups[name].push(row);
+      productGroups[name].push(mappedRow);
     });
 
     let successCount = 0;

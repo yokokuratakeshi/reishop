@@ -1,0 +1,108 @@
+Retrieving project…
+Deploying takeshis-projects-6138c88c/fc-ordering-tool
+Uploading [--------------------] (0.0B/762.5KB)
+Uploading [=====---------------] (202.5KB/762.5KB)
+Uploading [==========----------] (381.8KB/762.5KB)
+Uploading [===============-----] (583.2KB/762.5KB)
+Uploading [====================] (762.5KB/762.5KB)
+Inspect: https://vercel.com/takeshis-projects-6138c88c/fc-ordering-tool/92M4E7ErUYp9cCBLGFU9pc2Lwj2q [4s]
+Production: https://fc-ordering-tool-18ywtlubw-takeshis-projects-6138c88c.vercel.app [4s]
+https://fc-ordering-tool-18ywtlubw-takeshis-projects-6138c88c.vercel.appBuilding...
+Building...
+Building: Running build in Washington, D.C., USA (East) – iad1
+Building: Build machine configuration: 2 cores, 8 GB
+Building: Retrieving list of deployment files...
+Building: Previous build caches not available.
+Building: Downloading 128 deployment files...
+Building: Running "vercel build"
+Building: Vercel CLI 50.35.0
+Building: Installing dependencies...
+Building: npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+Building: added 842 packages in 22s
+Building: 252 packages are looking for funding
+Building: run `npm fund` for details
+Building: Detected Next.js version: 16.2.1
+Building: Running "npm run build"
+Building: > fc-ordering-tool@0.1.0 build
+Building: > next build
+Building: Attention: Next.js now collects completely anonymous telemetry regarding usage.
+Building: This information is used to shape Next.js' roadmap and prioritize features.
+Building: You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+Building: https://nextjs.org/telemetry
+Building: ▲ Next.js 16.2.1 (Turbopack)
+Building: ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+Building: Creating an optimized production build ...
+Building: ✓ Compiled successfully in 20.9s
+Building: Running TypeScript ...
+Building: Finished TypeScript in 7.8s ...
+Building: Collecting page data using 1 worker ...
+Building: Generating static pages using 1 worker (0/35) ...
+Building: Generating static pages using 1 worker (8/35)
+Building: Generating static pages using 1 worker (17/35)
+Building: Generating static pages using 1 worker (26/35)
+Building: ✓ Generating static pages using 1 worker (35/35) in 700ms
+Building: Finalizing page optimization ...
+Building: Running onBuildComplete from Vercel
+Building: Route (app)
+Building: ┌ ○ /
+Building: ├ ○ /_not-found
+Building: ├ ○ /admin/categories
+Building: ├ ○ /admin/dashboard
+Building: ├ ○ /admin/franchises
+Building: ├ ○ /admin/invoices
+Building: ├ ƒ /admin/invoices/[id]
+Building: ├ ○ /admin/orders
+Building: ├ ƒ /admin/orders/[id]
+Building: ├ ○ /admin/products
+Building: ├ ƒ /admin/products/[id]/edit
+Building: ├ ○ /admin/products/new
+Building: ├ ○ /admin/stages
+Building: ├ ƒ /api/admin/categories
+Building: ├ ƒ /api/admin/categories/[id]
+Building: ├ ƒ /api/admin/dashboard/stats
+Building: ├ ƒ /api/admin/franchises
+Building: ├ ƒ /api/admin/franchises/[id]
+Building: ├ ƒ /api/admin/imports/franchises
+Building: ├ ƒ /api/admin/imports/orders
+Building: ├ ƒ /api/admin/imports/products
+Building: ├ ƒ /api/admin/invoices
+Building: ├ ƒ /api/admin/invoices/[id]
+Building: ├ ƒ /api/admin/invoices/generate
+Building: ├ ƒ /api/admin/orders
+Building: ├ ƒ /api/admin/orders/[id]
+Building: ├ ƒ /api/admin/products
+Building: ├ ƒ /api/admin/products/[id]
+Building: ├ ƒ /api/admin/products/[id]/variants/[variantId]/prices
+Building: ├ ƒ /api/admin/products/[id]/variants/generate
+Building: ├ ƒ /api/admin/stages
+Building: ├ ƒ /api/admin/stages/[id]
+Building: ├ ƒ /api/auth/me
+Building: ├ ƒ /api/auth/session
+Building: ├ ƒ /api/franchise/invoices
+Building: ├ ƒ /api/franchise/invoices/[id]
+Building: ├ ƒ /api/orders
+Building: ├ ƒ /api/orders/[id]
+Building: ├ ƒ /api/orders/history
+Building: ├ ƒ /api/products/catalog
+Building: ├ ○ /cart
+Building: ├ ○ /catalog
+Building: ├ ○ /invoices
+Building: ├ ƒ /invoices/[id]
+Building: ├ ○ /login
+Building: ├ ○ /orders
+Building: ├ ƒ /orders/[id]
+Building: └ ○ /orders/success
+Building: ƒ Proxy (Middleware)
+Building: ○  (Static)   prerendered as static content
+Building: ƒ  (Dynamic)  server-rendered on demand
+Building: Build Completed in /vercel/output [55s]
+Building: Deploying outputs...
+Building: Deployment completed
+Building: Creating build cache...
+[2K[1A[2K[GProduction: https://fc-ordering-tool-18ywtlubw-takeshis-projects-6138c88c.vercel.app [1m]
+Completing...
+Aliased: https://fc-ordering-tool.vercel.app [1m]
+
+Common next commands:
+- `vercel inspect fc-ordering-tool-18ywtlubw-takeshis-projects-6138c88c.vercel.app --logs`
+- `vercel redeploy fc-ordering-tool-18ywtlubw-takeshis-projects-6138c88c.vercel.app`

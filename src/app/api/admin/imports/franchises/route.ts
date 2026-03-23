@@ -36,8 +36,33 @@ export async function POST(request: NextRequest) {
     const errors: string[] = [];
 
     for (let i = 0; i < body.length; i++) {
-      const row = body[i];
-      const parsed = franchiseImportRowSchema.safeParse(row);
+      let row = body[i];
+      
+      // 日本語ヘッダーのマッピング
+      const mappedRow: any = { ...row };
+      const mappings: Record<string, string> = {
+        "店舗コード": "franchise_code",
+        "加盟店コード": "franchise_code",
+        "店名": "name",
+        "店舗名": "name",
+        "加盟店名": "name",
+        "郵便番号": "postal_code",
+        "住所": "address",
+        "電話番号": "phone",
+        "メールアドレス": "email",
+        "メール": "email",
+        "ステージ": "stage_name",
+        "エリア": "area",
+        "都道府県": "prefecture"
+      };
+
+      Object.entries(mappings).forEach(([jp, en]) => {
+        if (row[jp] !== undefined && row[en] === undefined) {
+          mappedRow[en] = row[jp];
+        }
+      });
+
+      const parsed = franchiseImportRowSchema.safeParse(mappedRow);
       
       if (!parsed.success) {
         errors.push(`行 ${i + 1}: ${parsed.error.issues.map(e => e.message).join(", ")}`);
