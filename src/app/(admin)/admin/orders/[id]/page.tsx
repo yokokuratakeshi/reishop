@@ -175,24 +175,32 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {order.items.map((item, index) => (
-                    <TableRow key={index} className="border-border/30 hover:bg-muted/5 transition-colors">
-                      <TableCell className="pl-6 py-4">
-                        <p className="font-bold text-sm text-foreground">{item.product_name}</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">{formatAttributeValues(item.attribute_values)}</p>
-                        <p className="text-[9px] font-mono text-muted-foreground/60">{item.sku_code}</p>
-                      </TableCell>
-                      <TableCell className="text-center font-medium text-xs">
-                        {formatCurrency(item.wholesale_price || 0)}
-                      </TableCell>
-                      <TableCell className="text-center font-bold text-sm">
-                        {item.quantity}
-                      </TableCell>
-                      <TableCell className="text-right pr-6 font-bold text-primary">
-                        {formatCurrency((item.wholesale_price || 0) * item.quantity)}
+                  {(!order.items || order.items.length === 0) ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
+                        商品内訳データがありません
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    order.items.map((item, index) => (
+                      <TableRow key={index} className="border-border/30 hover:bg-muted/5 transition-colors">
+                        <TableCell className="pl-6 py-4">
+                          <p className="font-bold text-sm text-foreground">{item.product_name || "不明な商品"}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">{item.attribute_values ? formatAttributeValues(item.attribute_values) : ""}</p>
+                          <p className="text-[9px] font-mono text-muted-foreground/60">{item.sku_code || ""}</p>
+                        </TableCell>
+                        <TableCell className="text-center font-medium text-xs">
+                          {formatCurrency(item.wholesale_price || 0)}
+                        </TableCell>
+                        <TableCell className="text-center font-bold text-sm">
+                          {item.quantity || 0}
+                        </TableCell>
+                        <TableCell className="text-right pr-6 font-bold text-primary">
+                          {formatCurrency((item.wholesale_price || 0) * (item.quantity || 0))}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </CardContent>

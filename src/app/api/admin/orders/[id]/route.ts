@@ -2,7 +2,7 @@
 import { NextRequest } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { requireAdmin, successResponse, errorResponse, formatDateToISO } from "@/lib/utils/api";
-import { COLLECTIONS } from "@/lib/constants";
+import { COLLECTIONS, SUBCOLLECTIONS } from "@/lib/constants";
 
 export async function PATCH(
   request: NextRequest,
@@ -49,18 +49,25 @@ export async function GET(
 
   try {
     const { id: orderId } = await params;
-    const orderDoc = await adminDb.collection(COLLECTIONS.ORDERS).doc(orderId).get();
+    const orderRef = adminDb.collection(COLLECTIONS.ORDERS).doc(orderId);
+    const orderDoc = await orderRef.get();
 
     if (!orderDoc.exists) {
       return errorResponse("NOT_FOUND", "注文が見つかりません", 404);
     }
 
     const data = orderDoc.data()!;
-    console.log("Order detail data:", JSON.stringify(data));
     
+    // 注文明細（items）をサブコレクションから取得
+    const itemsSnapshot = await orderRef.collection(SUBCOLLECTIONS.ITEMS).get();
+    const items = itemsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
     // 加盟店名を取得
-    let franchiseName = "不明";
-    if (data.franchise_id && typeof data.franchise_id === "string") {
+    let franchiseName = data.franchise_name || "不明";
+    if (!data.franchise_name && data.franchise_id) {
       const franchiseDoc = await adminDb.collection(COLLECTIONS.FRANCHISES).doc(data.franchise_id).get();
       franchiseName = franchiseDoc.exists ? franchiseDoc.data()?.name : "不明";
     }
@@ -68,8 +75,9 @@ export async function GET(
     return successResponse({
       id: orderId,
       ...data,
+      items,
       franchise_name: franchiseName,
-      created_at: formatDateToISO(data.created_at),
+      created_at: formatDateToISO(data.created_at || data.ordered_at),
       updated_at: formatDateToISO(data.updated_at),
     });
   } catch (err: any) {

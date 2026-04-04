@@ -11,10 +11,10 @@ export async function GET(request: NextRequest) {
   if (error) return error;
 
   try {
-    // 全注文を新しい順に取得
+    // インデックス不足エラーを回避するため、まずはフィルタリングのみを行い、
+    // 並び替えはメモリ上（JavaScript）で行う
     const ordersSnapshot = await adminDb
       .collection(COLLECTIONS.ORDERS)
-      .orderBy("created_at", "desc")
       .get();
 
     // 加盟店情報を一括でキャッシュ（パフォーマンス向上のため）
@@ -34,15 +34,35 @@ export async function GET(request: NextRequest) {
 
     const orders = ordersSnapshot.docs.map(doc => {
       const data = doc.data();
+      
+      // 日時のパースを極めて堅牢にする
+      let timestamp = 0;
+      const rawDate = data.ordered_at || data.created_at || null;
+      if (rawDate) {
+        if (typeof rawDate.toDate === 'function') {
+          timestamp = rawDate.toDate().getTime();
+        } else if (rawDate instanceof Date) {
+          timestamp = rawDate.getTime();
+        } else if (rawDate.seconds) {
+          timestamp = rawDate.seconds * 1000;
+        } else if (typeof rawDate === 'string') {
+          timestamp = new Date(rawDate).getTime();
+        }
+      }
+
       return {
         id: doc.id,
         ...data,
         total_amount: Number(data.total_amount || 0),
         franchise_name: franchiseMap[data.franchise_id] || "不明な加盟店",
         created_at: formatDateToISO(data.created_at || data.ordered_at),
-        updated_at: data.updated_at?.toDate?.()?.toISOString() || data.updated_at,
+        updated_at: formatDateToISO(data.updated_at),
+        _sort_timestamp: timestamp
       };
     });
+
+    // メモリ上で降順（新しい順）に並べ替え
+    orders.sort((a, b) => b._sort_timestamp - a._sort_timestamp);
 
     return successResponse(orders);
   } catch (err) {
