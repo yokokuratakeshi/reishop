@@ -37,8 +37,9 @@ export async function GET(request: NextRequest) {
       return {
         id: doc.id,
         ...data,
+        total_amount: Number(data.total_amount || 0),
         franchise_name: franchiseMap[data.franchise_id] || "不明な加盟店",
-        created_at: formatDateToISO(data.created_at),
+        created_at: formatDateToISO(data.created_at || data.ordered_at),
         updated_at: data.updated_at?.toDate?.()?.toISOString() || data.updated_at,
       };
     });

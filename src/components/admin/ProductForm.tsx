@@ -19,10 +19,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Trash2, Zap, ChevronLeft } from "lucide-react";
+import { Plus, Trash2, Zap, ChevronLeft, Pencil, Check, X, Eye, EyeOff, CopyCheck } from "lucide-react";
 import Link from "next/link";
 import { Category, Stage, ProductVariant, VariantPrice } from "@/types";
-import { apiGet, apiPost, apiPut } from "@/lib/utils/apiClient";
+import { apiGet, apiPost, apiPut, apiPatch } from "@/lib/utils/apiClient";
 import { formatAttributeValues, formatCurrency } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
@@ -36,7 +36,6 @@ const productSchema = z.object({
   name: z.string().min(1, "商品名は必須です"),
   category_id: z.string().min(1, "カテゴリは必須です"),
   category_name: z.string().min(1),
-  product_type: z.enum(["apparel", "accessory", "non_apparel"]),
   description: z.string(),
   image_url: z.string().nullable().optional(),
   retail_price: z.number().min(0).nullable().optional(),
@@ -70,6 +69,9 @@ export default function ProductFormPage({ productId }: ProductFormPageProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSavingPrices, setIsSavingPrices] = useState(false);
   const [savedProductId, setSavedProductId] = useState<string | null>(productId ?? null);
+  // 価格一括適用用の状態
+  const [bulkPrice, setBulkPrice] = useState<string>("");
+  const [bulkTargetStages, setBulkTargetStages] = useState<Set<string>>(new Set());
 
   const {
     register,
@@ -83,7 +85,6 @@ export default function ProductFormPage({ productId }: ProductFormPageProps) {
       name: "",
       category_id: "",
       category_name: "",
-      product_type: "apparel",
       description: "",
       image_url: "",
       sort_order: 0,
@@ -123,7 +124,6 @@ export default function ProductFormPage({ productId }: ProductFormPageProps) {
       setValue("name", data.name);
       setValue("category_id", data.category_id);
       setValue("category_name", data.category_name);
-      setValue("product_type", data.product_type);
       setValue("description", data.description || "");
       setValue("image_url", data.image_url || "");
       setValue("retail_price", data.retail_price);
@@ -180,6 +180,17 @@ export default function ProductFormPage({ productId }: ProductFormPageProps) {
     ]);
   };
 
+  const addAttributeWithName = (name: string) => {
+    if (attributes.some(a => a.name === name)) {
+      toast.error(`すでに「${name}」は追加されています`);
+      return;
+    }
+    setAttributes((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), name, options: [], newOption: "" },
+    ]);
+  };
+
   const updateAttributeName = (id: string, name: string) => {
     setAttributes((prev) =>
       prev.map((a) => (a.id === id ? { ...a, name } : a))
@@ -192,7 +203,7 @@ export default function ProductFormPage({ productId }: ProductFormPageProps) {
         if (a.id !== id || !a.newOption.trim()) return a;
         if (a.options.includes(a.newOption.trim())) {
           toast.error("同じオプションが既に存在します");
-          return a;
+          return { ...a, newOption: "" };
         }
         return {
           ...a,
@@ -229,7 +240,7 @@ export default function ProductFormPage({ productId }: ProductFormPageProps) {
 
     setIsGenerating(true);
     try {
-      const result = await apiPost<{ generated_count: number; variants: ProductVariant[] }>(
+      const result = await apiPost<{ generated_count: number; added_count: number; skipped_count: number; variants: ProductVariant[] }>(
         `/api/admin/products/${savedProductId}/variants/generate`,
         {
           attributes: validAttributes.map((a) => ({
@@ -255,11 +266,50 @@ export default function ProductFormPage({ productId }: ProductFormPageProps) {
       });
       setPrices(initialPrices);
 
-      toast.success(`${result.generated_count}件のバリアントを生成しました`);
+      if (result.added_count > 0) {
+        toast.success(`${result.added_count}件のバリアントを追加しました${result.skipped_count > 0 ? `（${result.skipped_count}件は既存のためスキップ）` : ""}`);
+      } else if (result.skipped_count > 0) {
+        toast.info(`すべてのバリアントが既に存在しています（${result.skipped_count}件）`);
+      } else {
+        toast.success("バリアントを生成しました");
+      }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "生成に失敗しました");
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  // --- バリアント削除 ---
+  const removeVariant = async (variantId: string) => {
+    if (!savedProductId) return;
+    if (!confirm("このバリアントを削除しますか？関連する価格データも削除されます。")) return;
+
+    try {
+      await apiPost(`/api/admin/products/${savedProductId}/variants/${variantId}/delete`, {});
+      setVariants((prev) => prev.filter((v) => v.id !== variantId));
+      setPrices((prev) => {
+        const next = { ...prev };
+        delete next[variantId];
+        return next;
+      });
+      toast.success("バリアントを削除しました");
+    } catch {
+      toast.error("バリアントの削除に失敗しました");
+    }
+  };
+
+  // --- バリアント更新（SKU・有効/無効） ---
+  const updateVariant = async (variantId: string, data: { sku_code?: string; is_active?: boolean }) => {
+    if (!savedProductId) return;
+    try {
+      await apiPatch(`/api/admin/products/${savedProductId}/variants/${variantId}`, data);
+      setVariants((prev) =>
+        prev.map((v) => (v.id === variantId ? { ...v, ...data } : v))
+      );
+      toast.success("バリアントを更新しました");
+    } catch {
+      toast.error("バリアントの更新に失敗しました");
     }
   };
 
@@ -269,6 +319,46 @@ export default function ProductFormPage({ productId }: ProductFormPageProps) {
       ...prev,
       [variantId]: { ...(prev[variantId] ?? {}), [stageId]: value },
     }));
+  };
+
+  // --- 価格一括適用（選択したステージ全バリアントに同じ価格を設定） ---
+  const applyBulkPrice = () => {
+    const priceValue = Number(bulkPrice);
+    if (isNaN(priceValue) || priceValue < 0) {
+      toast.error("有効な価格を入力してください");
+      return;
+    }
+    if (bulkTargetStages.size === 0) {
+      toast.error("適用先のステージを選択してください");
+      return;
+    }
+    setPrices((prev) => {
+      const next = { ...prev };
+      variants.forEach((v) => {
+        next[v.id] = { ...(next[v.id] ?? {}) };
+        bulkTargetStages.forEach((stageId) => {
+          next[v.id][stageId] = priceValue;
+        });
+      });
+      return next;
+    });
+    toast.success(`${bulkTargetStages.size}ステージ × ${variants.length}バリアントに一括適用しました`);
+  };
+
+  const toggleBulkStage = (stageId: string) => {
+    setBulkTargetStages((prev) => {
+      const next = new Set(prev);
+      if (next.has(stageId)) {
+        next.delete(stageId);
+      } else {
+        next.add(stageId);
+      }
+      return next;
+    });
+  };
+
+  const selectAllBulkStages = () => {
+    setBulkTargetStages(new Set(stages.map((s) => s.id)));
   };
 
   // --- 価格一括保存 ---
@@ -338,7 +428,12 @@ export default function ProductFormPage({ productId }: ProductFormPageProps) {
           <CardTitle className="text-base">基本情報</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" onKeyDown={(e) => {
+            // Enterキーでのフォーム送信を防止（送信ボタンクリック時のみ送信）
+            if (e.key === "Enter" && (e.target as HTMLElement).tagName !== "BUTTON") {
+              e.preventDefault();
+            }
+          }}>
             <div className="mb-6 pb-6 border-b border-border/50">
               <ImageUpload 
                 value={watch("image_url") || ""} 
@@ -358,10 +453,12 @@ export default function ProductFormPage({ productId }: ProductFormPageProps) {
                 <Label>カテゴリ *</Label>
                 <Select
                   value={watchedCategoryId}
-                  onValueChange={(v: unknown) => setValue("category_id", v as string)}
+                  onValueChange={(v) => setValue("category_id", v || "")}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="カテゴリを選択" />
+                  <SelectTrigger id="category-select">
+                    <SelectValue placeholder="カテゴリを選択">
+                      {categories.find(c => c.id === (watchedCategoryId || ""))?.name}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((cat) => (
@@ -371,20 +468,6 @@ export default function ProductFormPage({ productId }: ProductFormPageProps) {
                 </Select>
 
                 {errors.category_id && <p className="text-destructive text-xs">{errors.category_id.message}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <Label>商品タイプ *</Label>
-                <Select defaultValue="apparel" onValueChange={(v) => setValue("product_type", v as "apparel" | "accessory" | "non_apparel")}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="apparel">アパレル</SelectItem>
-                    <SelectItem value="accessory">アクセサリー</SelectItem>
-                    <SelectItem value="non_apparel">非アパレル</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
 
               <div className="space-y-2">
@@ -416,10 +499,20 @@ export default function ProductFormPage({ productId }: ProductFormPageProps) {
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">属性設定（バリエーション）</CardTitle>
-          <Button variant="outline" size="sm" onClick={addAttribute}>
-            <Plus className="w-4 h-4 mr-1" />
-            属性を追加
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={() => addAttributeWithName("サイズ")}>
+              <Plus className="w-3 h-3 mr-1" /> サイズ
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => addAttributeWithName("カラー")}>
+              <Plus className="w-3 h-3 mr-1" /> カラー
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => addAttributeWithName("ロゴ")}>
+              <Plus className="w-3 h-3 mr-1" /> ロゴ
+            </Button>
+            <Button variant="outline" size="sm" onClick={addAttribute}>
+              <Plus className="w-3 h-3 mr-1" /> 任意属性
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {attributes.length === 0 ? (
@@ -435,6 +528,7 @@ export default function ProductFormPage({ productId }: ProductFormPageProps) {
                     placeholder="属性名（例: カラー, サイズ）"
                     value={attr.name}
                     onChange={(e) => updateAttributeName(attr.id, e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
                     className="max-w-xs"
                   />
                   <Button
@@ -473,12 +567,6 @@ export default function ProductFormPage({ productId }: ProductFormPageProps) {
                         )
                       )
                     }
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        addOption(attr.id);
-                      }
-                    }}
                     className="max-w-xs"
                   />
                   <Button variant="outline" size="sm" onClick={() => addOption(attr.id)}>
@@ -520,6 +608,61 @@ export default function ProductFormPage({ productId }: ProductFormPageProps) {
             </Badge>
           </CardHeader>
           <CardContent>
+            {/* 価格一括適用 */}
+            <div className="mb-6 p-4 bg-muted/50 rounded-xl border border-border space-y-3">
+              <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <CopyCheck className="w-4 h-4" />
+                価格の一括適用
+              </p>
+              <div className="flex flex-wrap gap-2 items-center">
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="一括適用する価格（円）"
+                  className="w-48"
+                  value={bulkPrice}
+                  onChange={(e) => setBulkPrice(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
+                />
+                <span className="text-sm text-muted-foreground">→</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {stages.map((stage) => (
+                    <button
+                      key={stage.id}
+                      type="button"
+                      onClick={() => toggleBulkStage(stage.id)}
+                      className={cn(
+                        "px-3 py-1 rounded-full text-xs font-medium border transition-colors",
+                        bulkTargetStages.has(stage.id)
+                          ? "bg-primary text-white border-primary"
+                          : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                      )}
+                    >
+                      {stage.name}
+                    </button>
+                  ))}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-muted-foreground"
+                  onClick={selectAllBulkStages}
+                  type="button"
+                >
+                  全選択
+                </Button>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={applyBulkPrice}
+                type="button"
+                disabled={!bulkPrice || bulkTargetStages.size === 0}
+              >
+                選択ステージに一括適用
+              </Button>
+            </div>
+
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -532,20 +675,47 @@ export default function ProductFormPage({ productId }: ProductFormPageProps) {
                         {stage.name}（FC卸）
                       </th>
                     ))}
+                    <th className="w-10" />
                   </tr>
                 </thead>
                 <tbody>
                   {variants.map((variant) => (
-                    <tr key={variant.id} className="border-b border-border last:border-0">
+                    <tr key={variant.id} className={cn("border-b border-border last:border-0", variant.is_active === false && "opacity-50")}>
                       <td className="py-2 pr-4">
-                        <span className="text-foreground">
-                          {Object.keys(variant.attribute_values ?? {}).length > 0
-                            ? formatAttributeValues(variant.attribute_values)
-                            : "（バリアントなし）"}
-                        </span>
-                        <span className="text-muted-foreground text-xs ml-2">
-                          {variant.sku_code}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-foreground">
+                            {Object.keys(variant.attribute_values ?? {}).length > 0
+                              ? formatAttributeValues(variant.attribute_values)
+                              : "（バリアントなし）"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 mt-1">
+                          <Input
+                            defaultValue={variant.sku_code}
+                            className="h-6 text-xs w-32 px-1.5 text-muted-foreground"
+                            onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
+                            onBlur={(e) => {
+                              const newSku = e.target.value.trim();
+                              if (newSku && newSku !== variant.sku_code) {
+                                updateVariant(variant.id, { sku_code: newSku });
+                              }
+                            }}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={cn(
+                              "h-6 w-6 p-0",
+                              variant.is_active === false
+                                ? "text-muted-foreground hover:text-green-600"
+                                : "text-green-600 hover:text-muted-foreground"
+                            )}
+                            onClick={() => updateVariant(variant.id, { is_active: !(variant.is_active ?? true) })}
+                            title={variant.is_active === false ? "有効にする" : "無効にする"}
+                          >
+                            {variant.is_active === false ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </Button>
+                        </div>
                       </td>
                       {stages.map((stage) => (
                         <td key={stage.id} className="py-2 px-3 text-center">
@@ -558,9 +728,21 @@ export default function ProductFormPage({ productId }: ProductFormPageProps) {
                             onChange={(e) =>
                               updatePrice(variant.id, stage.id, Number(e.target.value))
                             }
+                            onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
                           />
                         </td>
                       ))}
+                      <td className="py-2 pl-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground hover:text-destructive h-8 w-8 p-0"
+                          onClick={() => removeVariant(variant.id)}
+                          title="バリアントを削除"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

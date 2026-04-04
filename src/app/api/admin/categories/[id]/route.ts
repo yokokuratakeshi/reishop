@@ -10,6 +10,7 @@ import { FieldValue } from "firebase-admin/firestore";
 
 const updateCategorySchema = z.object({
   name: z.string().min(1).optional(),
+  color: z.string().optional(),
   sort_order: z.number().int().min(0).optional(),
   is_active: z.boolean().optional(),
 });

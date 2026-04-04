@@ -1,7 +1,7 @@
 "use client";
 
 import { useCart } from "@/lib/store/useCart";
-import { ShoppingCart, User, Package } from "lucide-react";
+import { ShoppingCart, User, Package, ClipboardList } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -42,13 +42,23 @@ export default function FranchiseLayout({
             <Link 
               href="/catalog" 
               className={cn("p-2 rounded-full transition-colors", pathname === "/catalog" ? "text-primary bg-primary/10" : "text-muted-foreground hover:bg-muted")}
+              title="商品カタログ"
             >
               <Package className="w-5 h-5" />
             </Link>
             
-            <Link 
-              href="/cart" 
+            <Link
+              href="/orders"
+              className={cn("p-2 rounded-full transition-colors", pathname.startsWith("/orders") ? "text-primary bg-primary/10" : "text-muted-foreground hover:bg-muted")}
+              title="発注履歴"
+            >
+              <ClipboardList className="w-5 h-5" />
+            </Link>
+
+            <Link
+              href="/cart"
               className={cn("relative p-2 rounded-full transition-colors", pathname === "/cart" ? "text-primary bg-primary/10" : "text-muted-foreground hover:bg-muted")}
+              title="カート"
             >
               <ShoppingCart className="w-5 h-5" />
               {cartCount > 0 && (

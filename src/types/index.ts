@@ -49,6 +49,7 @@ export interface Franchise {
   stage_name: string;
   registration_completed: boolean;
   email: string | null;
+  auth_uid?: string | null;
   is_active: boolean;
   created_at: Timestamp;
   updated_at: Timestamp;
@@ -60,6 +61,7 @@ export interface Franchise {
 export interface Category {
   id: string;
   name: string;
+  color?: string; // カテゴリ識別用カラー（例: "#3B82F6"）
   sort_order: number;
   is_active: boolean;
   created_at: Timestamp;
@@ -69,7 +71,7 @@ export interface Category {
 // ----------------------
 // 商品
 // ----------------------
-export type ProductType = "apparel" | "accessory" | "non_apparel";
+
 
 export interface Product {
   id: string;
@@ -78,7 +80,7 @@ export interface Product {
   name: string;
   description: string;
   image_url: string | null;
-  product_type: ProductType;
+  product_type?: string; // レガシー（未使用）
   retail_price: number | null; // 管理画面のみ表示
   retail_price_tax_incl: number | null; // 管理画面のみ表示
   has_variants: boolean;
@@ -150,6 +152,7 @@ export interface Order {
   item_count: number;
   total_quantity: number;
   ordered_at: Timestamp;
+  created_at: Timestamp;
   updated_at: Timestamp;
   note: string | null;
 }
@@ -188,6 +191,19 @@ export interface Invoice {
   issued_at: Timestamp | null;
   created_at: Timestamp;
   updated_at: Timestamp;
+}
+
+// ----------------------
+// 招待リンク
+// ----------------------
+export interface Invitation {
+  id: string;
+  franchise_id: string;
+  token: string;
+  expires_at: Timestamp;
+  used: boolean;
+  created_at: Timestamp;
+  used_at?: Timestamp | null;
 }
 
 // ----------------------

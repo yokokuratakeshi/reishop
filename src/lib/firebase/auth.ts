@@ -14,7 +14,9 @@ import { auth } from "./config";
 // メール・パスワードでサインイン
 export const signIn = async (email: string, password: string) => {
   const userCredential = await signInWithEmailAndPassword(auth, email, password);
-  const idToken = await userCredential.user.getIdToken();
+
+  // カスタムクレーム（role等）を確実に反映するためトークンを強制リフレッシュ
+  const idToken = await userCredential.user.getIdToken(true);
 
   // サーバーサイドセッションの設定
   await fetch("/api/auth/session", {

@@ -22,6 +22,7 @@ export default function AdminLayout({
     { label: "加盟店管理", href: "/admin/franchises" },
     { label: "発注一覧", href: "/admin/orders" },
     { label: "請求書管理", href: "/admin/invoices" },
+    { label: "マニュアル", href: "/admin/manual" },
   ];
 
   return (
@@ -46,7 +47,7 @@ export default function AdminLayout({
         <nav className="flex-1 p-4 space-y-1">
           <p className="text-xs text-neutral-500 uppercase tracking-wider px-3 py-2">メニュー</p>
           {navItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <Link
                 key={item.href}

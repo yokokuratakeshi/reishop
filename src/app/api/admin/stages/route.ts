@@ -3,6 +3,9 @@
 
 import { NextRequest } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
+
+export const dynamic = "force-dynamic";
+
 import { requireAdmin, successResponse, errorResponse } from "@/lib/utils/api";
 import { COLLECTIONS } from "@/lib/constants";
 import { z } from "zod";
@@ -17,14 +20,16 @@ export async function GET(request: NextRequest) {
   const { error } = await requireAdmin(request);
   if (error) return error;
 
-  try {
-    const snapshot = await adminDb
-      .collection(COLLECTIONS.STAGES)
-      .orderBy("sort_order", "asc")
-      .get();
-
-    const stages = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    return successResponse(stages);
+    try {
+      const snapshot = await adminDb
+        .collection(COLLECTIONS.STAGES)
+        .orderBy("sort_order", "asc")
+        .get();
+  
+      const stages = snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .filter((s: any) => s.is_active !== false);
+      return successResponse(stages);
   } catch (err) {
     console.error("ステージ一覧取得エラー:", err);
     return errorResponse("INTERNAL_ERROR", "データの取得に失敗しました", 500);

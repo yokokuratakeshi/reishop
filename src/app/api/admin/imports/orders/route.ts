@@ -52,38 +52,73 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    let successCount = 0;
+    const errors: string[] = [];
+
+    // ヘッダーのマッピング定義
+    const mappings: Record<string, string> = {
+      "発注番号": "order_number",
+      "注文番号": "order_number",
+      "受注番号": "order_number",
+      "店舗コード": "franchise_code",
+      "加盟店コード": "franchise_code",
+      "No": "franchise_code",
+      "発注日": "ordered_at",
+      "注文日": "ordered_at",
+      "日付": "ordered_at",
+      "SKUコード": "sku_code",
+      "SKU": "sku_code",
+      "商品コード": "sku_code",
+      "数量": "quantity",
+      "個数": "quantity",
+      "単価": "wholesale_price",
+      "卸単価": "wholesale_price",
+      "ステータス": "status"
+    };
+
+    // グループ化の前に各行をマッピング
+    const mappedBody = body.map((row, index) => {
+      const mappedRow: any = { ...row };
+      Object.entries(mappings).forEach(([jp, en]) => {
+        if (row[jp] !== undefined && row[en] === undefined) {
+          mappedRow[en] = row[jp];
+        }
+      });
+      return mappedRow;
+    });
+
     // 2. 発注番号でグループ化
     const orderGroups: Record<string, any[]> = {};
-    body.forEach(row => {
+    mappedBody.forEach(row => {
       const num = row.order_number || "Unknown";
       if (!orderGroups[num]) orderGroups[num] = [];
       orderGroups[num].push(row);
     });
 
-    let successCount = 0;
-    const errors: string[] = [];
-
-    for (const [orderNumber, items] of Object.entries(orderGroups)) {
+    for (const [orderNumber, rowItems] of Object.entries(orderGroups)) {
       try {
-        const proto = items[0];
+        const protoRaw = rowItems[0];
+        const parsed = orderImportRowSchema.safeParse(protoRaw);
+        
+        if (!parsed.success) {
+          throw new Error(`データの形式が正しくありません: ${parsed.error.issues.map(i => i.message).join(", ")}`);
+        }
+        
+        const proto = parsed.data;
         const franchise = franchiseMap[proto.franchise_code];
         if (!franchise) {
-          errors.push(`${orderNumber}: 店舗コード ${proto.franchise_code} が見つかりません`);
-          continue;
+          throw new Error(`店舗コード "${proto.franchise_code}" が登録されていません。先に店舗データをインポートしてください。`);
         }
 
         const orderedAt = new Date(proto.ordered_at);
         if (isNaN(orderedAt.getTime())) {
-          errors.push(`${orderNumber}: 発注日の形式が不正です (${proto.ordered_at})`);
-          continue;
+          throw new Error(`発注日の形式が不正です (${proto.ordered_at})`);
         }
 
-        // 受注ドキュメントの作成（既存チェックは簡易化のため新規作成またはマージ）
-        const orderRef = adminDb.collection(COLLECTIONS.ORDERS).doc(); // ランダムIDだが、既にある場合は order_number で検索して更新も検討可能
-        // 今回は order_number で既存を検索
+        // 受注ドキュメントの検索と作成
         const existingOrderSnap = await adminDb.collection(COLLECTIONS.ORDERS).where("order_number", "==", orderNumber).limit(1).get();
+        let targetOrderRef = adminDb.collection(COLLECTIONS.ORDERS).doc();
         
-        let targetOrderRef = orderRef;
         if (!existingOrderSnap.empty) {
           targetOrderRef = existingOrderSnap.docs[0].ref;
         }
@@ -93,14 +128,14 @@ export async function POST(request: NextRequest) {
         let totalQuantity = 0;
         const processedItems = [];
 
-        for (const itemRow of items) {
+        for (const itemRow of rowItems) {
           const skuInfo = skuMap[itemRow.sku_code];
           if (!skuInfo) {
-            throw new Error(`SKUコード ${itemRow.sku_code} が見つかりません`);
+            throw new Error(`SKUコード "${itemRow.sku_code}" が商品マスタに見つかりません`);
           }
 
-          const qty = parseInt(itemRow.quantity);
-          const price = parseFloat(itemRow.wholesale_price);
+          const qty = Number(itemRow.quantity);
+          const price = Number(itemRow.wholesale_price);
           const subtotal = qty * price;
 
           totalAmount += subtotal;
@@ -122,26 +157,26 @@ export async function POST(request: NextRequest) {
           order_number: orderNumber,
           franchise_id: franchise.id,
           franchise_name: franchise.name,
-          franchise_no: franchise.no,
+          franchise_no: franchise.no || null,
           stage_id: franchise.stage_id,
           stage_name: stageNameMap[franchise.stage_id] || "不明",
           status: proto.status || "pending",
           total_amount: totalAmount,
           total_quantity: totalQuantity,
           item_count: processedItems.length,
+          main_category_name: rowItems[0]?.category_name || processedItems[0]?.product_name || "その他",
           ordered_at: Timestamp.fromDate(orderedAt),
-         updated_at: now,
-         created_at: now,
-       };
+          updated_at: now,
+          created_at: now,
+        };
 
         if (!existingOrderSnap.empty) {
-          delete (orderData as any).created_at; // 更新時は作成日を保持
+          delete (orderData as any).created_at;
         }
 
         await targetOrderRef.set(orderData, { merge: true });
 
-        // 明細サブコレクションの更新（一旦削除して再登録するか、追加するか）
-        // 簡易化のため一旦既存を全削除（移行用なのでそれほど多くない想定）
+        // 明細の一旦削除と再登録
         const existingItems = await targetOrderRef.collection(SUBCOLLECTIONS.ITEMS).get();
         const itemBatch = adminDb.batch();
         existingItems.forEach(doc => itemBatch.delete(doc.ref));
@@ -162,7 +197,7 @@ export async function POST(request: NextRequest) {
     return successResponse({
       successCount,
       errorCount: errors.length,
-      errors: errors.slice(0, 10),
+      errors: errors.slice(0, 20),
     });
   } catch (err: any) {
     console.error("Order import error:", err);

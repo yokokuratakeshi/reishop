@@ -200,7 +200,7 @@ export default function StagesPage() {
               {editingStage ? "ステージを編集" : "ステージを追加"}
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2" onKeyDown={(e) => { if (e.key === "Enter" && (e.target as HTMLElement).tagName !== "BUTTON") e.preventDefault(); }}>
             <div className="space-y-2">
               <Label htmlFor="stage-name">ステージ名</Label>
               <Input

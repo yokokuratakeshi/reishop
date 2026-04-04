@@ -9,6 +9,7 @@ export const COLLECTIONS = {
   PRODUCTS: "products",
   ORDERS: "orders",
   INVOICES: "invoices",
+  INVITATIONS: "invitations",
 } as const;
 
 export const SUBCOLLECTIONS = {
@@ -23,13 +24,6 @@ export const SUBCOLLECTIONS = {
 export const USER_ROLES = {
   ADMIN: "admin",
   FRANCHISE: "franchise",
-} as const;
-
-// 商品タイプ
-export const PRODUCT_TYPES = {
-  APPAREL: "apparel",
-  ACCESSORY: "accessory",
-  NON_APPAREL: "non_apparel",
 } as const;
 
 // 発注ステータス

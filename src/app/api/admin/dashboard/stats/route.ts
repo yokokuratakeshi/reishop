@@ -1,62 +1,88 @@
-// 管理者ダッシュボード統計 API
+// 管理者ダッシュボード統計 API（パフォーマンス最適化版）
+// カウントクエリとリミット付きクエリで必要最小限のデータを取得
+
 import { NextRequest } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { requireAdmin, successResponse, errorResponse } from "@/lib/utils/api";
 import { COLLECTIONS } from "@/lib/constants";
 
 export async function GET(request: NextRequest) {
-  // 管理者権限チェック
   const { error } = await requireAdmin(request);
   if (error) return error;
 
   try {
-    // 1. 各種カウント取得
-    const [ordersSnap, franchisesSnap, productsSnap] = await Promise.all([
-      adminDb.collection(COLLECTIONS.ORDERS).get(),
-      adminDb.collection(COLLECTIONS.FRANCHISES).get(),
-      adminDb.collection(COLLECTIONS.PRODUCTS).get(),
+    // 直近6ヶ月の起点を計算
+    const now = new Date();
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+
+    // === 最適化: 5つのクエリを並列実行 ===
+    const [
+      franchisesSnap,
+      productsSnap,
+      recentOrdersSnap,
+      ordersForStatsSnap,
+      allOrdersSnap,
+    ] = await Promise.all([
+      // 加盟店カウント（軽量：ドキュメントIDのみ）
+      adminDb.collection(COLLECTIONS.FRANCHISES).select().get(),
+      // 商品カウント（軽量：ドキュメントIDのみ）
+      adminDb.collection(COLLECTIONS.PRODUCTS).select().get(),
+      // 直近の注文5件（表示用）
+      adminDb.collection(COLLECTIONS.ORDERS).orderBy("created_at", "desc").limit(5).get(),
+      // 直近6ヶ月の注文（統計用）
+      adminDb.collection(COLLECTIONS.ORDERS)
+        .where("created_at", ">=", sixMonthsAgo)
+        .get(),
+      // 全注文のカウントと合計用（軽量フィールドのみ）
+      adminDb.collection(COLLECTIONS.ORDERS)
+        .select("status", "total_amount")
+        .get(),
     ]);
 
-    const totalOrders = ordersSnap.size;
-    const totalFranchises = franchisesSnap.size;
-    const totalProducts = productsSnap.size;
-
-    // 2. 詳細分析用データ
+    // 全体統計（軽量データから計算）
     let totalSales = 0;
     let pendingOrders = 0;
+    allOrdersSnap.forEach((doc) => {
+      const data = doc.data();
+      if (data.status === "pending") pendingOrders++;
+      if (data.status !== "cancelled") {
+        totalSales += data.total_amount || 0;
+      }
+    });
+
+    // 月別・カテゴリ別集計（直近6ヶ月分のみ）
     const monthlyMap: Record<string, number> = {};
     const categoryMap: Record<string, number> = {};
 
-    // 直近6ヶ月のキーを初期化（データがなくても0を表示するため）
-    const nowObj = new Date();
+    // 直近6ヶ月のキーを初期化
     for (let i = 5; i >= 0; i--) {
-      const d = new Date(nowObj.getFullYear(), nowObj.getMonth() - i, 1);
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       monthlyMap[key] = 0;
     }
-    
-    ordersSnap.forEach(doc => {
+
+    ordersForStatsSnap.forEach((doc) => {
       const data = doc.data();
-      const createdAt = data.created_at?.toDate?.() || new Date(data.created_at);
-      const monthKey = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, "0")}`;
+      if (data.status === "cancelled") return;
 
-      if (data.status === "pending") pendingOrders++;
+      // 日付の取得（created_at または ordered_at）
+      const dateValue = data.created_at || data.ordered_at;
+      const createdAt = dateValue?.toDate?.() || new Date(dateValue);
       
-      if (data.status !== "cancelled") {
-        const amount = data.total_amount || 0;
-        totalSales += amount;
+      if (isNaN(createdAt.getTime())) return;
 
-        // 月別集計
-        if (monthlyMap[monthKey] !== undefined) {
-          monthlyMap[monthKey] += amount;
-        }
+      const monthKey = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, "0")}`;
+      const amount = Number(data.total_amount || 0);
 
-        // カテゴリ別集計（注文アイテムから集計）
-        // ※ 簡易化のため、注文データの最初の商品カテゴリを使用するか、
-        // 本来は order_items を全スキャンすべきだが、ここでは代表値として処理
-        const categoryName = data.items?.[0]?.category_name || "その他";
-        categoryMap[categoryName] = (categoryMap[categoryName] || 0) + amount;
+      if (monthlyMap[monthKey] !== undefined) {
+        monthlyMap[monthKey] += amount;
       }
+
+      // カテゴリ名（ドキュメントに記録されている場合はそれを使用、なければ「その他」）
+      // 注意: 現在のデータ構造では明細サブコレクションにあるため、
+      // 注文時に代表カテゴリを記録する運用が望ましい。
+      const categoryName = data.main_category_name || data.items?.[0]?.category_name || "その他";
+      categoryMap[categoryName] = (categoryMap[categoryName] || 0) + amount;
     });
 
     const salesByMonth = Object.entries(monthlyMap)
@@ -65,22 +91,24 @@ export async function GET(request: NextRequest) {
 
     const salesByCategory = Object.entries(categoryMap)
       .map(([name, value]) => ({ name, value }))
+      .filter(item => item.value > 0)
       .sort((a, b) => b.value - a.value);
 
-    // 3. 直近の注文（5件）
-    const recentOrdersSnap = await adminDb
-      .collection(COLLECTIONS.ORDERS)
-      .orderBy("created_at", "desc")
-      .limit(5)
-      .get();
+    // 加盟店名マップ（直近注文表示用）
+    const franchiseIds = [...new Set(recentOrdersSnap.docs.map((d) => d.data().franchise_id).filter(Boolean))];
+    let franchiseMap: Record<string, string> = {};
+    if (franchiseIds.length > 0) {
+      // Firestoreのin句は最大30件なのでスライス
+      const franchiseSnap = await adminDb
+        .collection(COLLECTIONS.FRANCHISES)
+        .where("__name__", "in", franchiseIds.slice(0, 30))
+        .get();
+      franchiseSnap.forEach((doc) => {
+        franchiseMap[doc.id] = doc.data().name;
+      });
+    }
 
-    // 加盟店名を紐付け
-    const franchiseMap: Record<string, string> = {};
-    franchisesSnap.forEach(doc => {
-      franchiseMap[doc.id] = doc.data().name;
-    });
-
-    const recentOrders = recentOrdersSnap.docs.map(doc => {
+    const recentOrders = recentOrdersSnap.docs.map((doc) => {
       const data = doc.data();
       return {
         id: doc.id,
@@ -94,9 +122,9 @@ export async function GET(request: NextRequest) {
 
     return successResponse({
       stats: {
-        totalOrders,
-        totalFranchises,
-        totalProducts,
+        totalOrders: allOrdersSnap.size,
+        totalFranchises: franchisesSnap.size,
+        totalProducts: productsSnap.size,
         totalSales,
         pendingOrders,
         salesByMonth,

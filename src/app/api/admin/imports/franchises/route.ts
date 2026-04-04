@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
       const mappings: Record<string, string> = {
         "店舗コード": "franchise_code",
         "加盟店コード": "franchise_code",
+        "No": "franchise_code", // ここを追加
         "店名": "name",
         "店舗名": "name",
         "加盟店名": "name",
@@ -71,15 +72,25 @@ export async function POST(request: NextRequest) {
 
       const { id, stage_id, stage_name, ...data } = parsed.data;
       
-      // ステージの解決
+      // ステージの解決（「0期」といった入力にも対応）
       let finalStageId = stage_id;
       let finalStageName = stage_name;
 
       if (stage_id) {
-        const stage = stages.find(s => s.id === stage_id);
-        if (stage) finalStageName = stage.name;
+        const stage = stages.find(s => s.id === stage_id || s.name === stage_id);
+        if (stage) {
+          finalStageId = stage.id;
+          finalStageName = stage.name;
+        }
       } else if (stage_name) {
-        const stage = stages.find(s => s.name === stage_name);
+        // ステージ名が「0期」などの場合に「stage_0」に変換するなどの柔軟な対応
+        const cleanStageName = String(stage_name).replace("期", "");
+        const stage = stages.find(s => 
+          s.name === stage_name || 
+          s.id === stage_name || 
+          s.id === `stage_${cleanStageName}` ||
+          s.name.includes(cleanStageName)
+        );
         if (stage) {
           finalStageId = stage.id;
           finalStageName = stage.name;
@@ -87,7 +98,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (!finalStageId) {
-        errors.push(`行 ${i + 1}: ステージが見つかりません (${stage_id || stage_name})`);
+        errors.push(`行 ${i + 1}: ステージが見つかりません (${stage_id || stage_name})。ステージ名を確認してください。`);
         continue;
       }
 

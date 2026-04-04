@@ -182,7 +182,7 @@ export default function DashboardPage() {
                     axisLine={false} 
                     tickLine={false} 
                     tick={{ fontSize: 12, fontWeight: 600 }}
-                    tickFormatter={(value) => `¥${(value / 1000).toLocaleString()}k`}
+                    tickFormatter={(value) => value >= 10000 ? `¥${(value / 10000).toLocaleString()}万` : `¥${value.toLocaleString()}`}
                   />
                   <Tooltip 
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}

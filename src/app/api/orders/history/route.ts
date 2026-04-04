@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const ordersSnapshot = await adminDb
       .collection(COLLECTIONS.ORDERS)
       .where("franchise_id", "==", user.franchiseId)
-      .orderBy("ordered_at", "desc")
+      .orderBy("created_at", "desc")
       .get();
 
     const orders = ordersSnapshot.docs.map(doc => ({

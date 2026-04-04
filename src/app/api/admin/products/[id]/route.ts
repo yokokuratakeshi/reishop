@@ -1,4 +1,4 @@
-// 商品個別操作 API および属性・バリアント管理 API
+// 商品個別操作 API（パフォーマンス最適化版）
 // GET: 詳細取得（属性・バリアント・価格含む） / PUT: 編集 / DELETE: 論理削除
 
 import { NextRequest } from "next/server";
@@ -14,14 +14,13 @@ const updateProductSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
   image_url: z.string().nullable().optional(),
-  product_type: z.enum(["apparel", "accessory", "non_apparel"]).optional(),
   retail_price: z.number().min(0).nullable().optional(),
   retail_price_tax_incl: z.number().min(0).nullable().optional(),
   sort_order: z.number().int().min(0).optional(),
   is_active: z.boolean().optional(),
 });
 
-// 商品詳細取得（属性・バリアント・価格を含む）
+// 商品詳細取得（属性・バリアント・価格を含む）- 最適化版
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -31,54 +30,52 @@ export async function GET(
 
   const { id } = await params;
   try {
-    const productDoc = await adminDb.collection(COLLECTIONS.PRODUCTS).doc(id).get();
+    const productRef = adminDb.collection(COLLECTIONS.PRODUCTS).doc(id);
+
+    // === 最適化: 商品・属性・バリアントを並列取得 ===
+    const [productDoc, attributesSnapshot, variantsSnapshot] = await Promise.all([
+      productRef.get(),
+      productRef.collection(SUBCOLLECTIONS.ATTRIBUTES).orderBy("sort_order", "asc").get(),
+      productRef.collection(SUBCOLLECTIONS.VARIANTS).get(),
+    ]);
+
     if (!productDoc.exists) {
       return errorResponse("NOT_FOUND", "商品が見つかりません", 404);
     }
 
-    // 属性グループを取得
-    const attributesSnapshot = await adminDb
-      .collection(COLLECTIONS.PRODUCTS)
-      .doc(id)
-      .collection(SUBCOLLECTIONS.ATTRIBUTES)
-      .orderBy("sort_order", "asc")
-      .get();
-
-    const attributes = await Promise.all(
-      attributesSnapshot.docs.map(async (attrDoc) => {
-        // 各属性のオプションを取得
-        const optionsSnapshot = await attrDoc.ref
-          .collection(SUBCOLLECTIONS.OPTIONS)
-          .orderBy("sort_order", "asc")
-          .get();
-        const options = optionsSnapshot.docs.map((optDoc) => ({
-          id: optDoc.id,
-          ...optDoc.data(),
-        }));
-        return { id: attrDoc.id, ...attrDoc.data(), options };
-      })
+    // === 最適化: オプションと価格を並列で一括取得 ===
+    const optionPromises = attributesSnapshot.docs.map((attrDoc) =>
+      attrDoc.ref.collection(SUBCOLLECTIONS.OPTIONS).orderBy("sort_order", "asc").get()
+    );
+    const pricePromises = variantsSnapshot.docs.map((varDoc) =>
+      varDoc.ref.collection(SUBCOLLECTIONS.PRICES).get()
     );
 
-    // バリアントを取得
-    const variantsSnapshot = await adminDb
-      .collection(COLLECTIONS.PRODUCTS)
-      .doc(id)
-      .collection(SUBCOLLECTIONS.VARIANTS)
-      .get();
+    // 全サブコレクションを一括並列取得
+    const [optionResults, priceResults] = await Promise.all([
+      Promise.all(optionPromises),
+      Promise.all(pricePromises),
+    ]);
 
-    const variants = await Promise.all(
-      variantsSnapshot.docs.map(async (varDoc) => {
-        // 各バリアントのステージ別価格を取得
-        const pricesSnapshot = await varDoc.ref
-          .collection(SUBCOLLECTIONS.PRICES)
-          .get();
-        const prices = pricesSnapshot.docs.map((priceDoc) => ({
-          id: priceDoc.id,
-          ...priceDoc.data(),
-        }));
-        return { id: varDoc.id, ...varDoc.data(), prices };
-      })
-    );
+    // 属性 + オプションを結合
+    const attributes = attributesSnapshot.docs.map((attrDoc, idx) => ({
+      id: attrDoc.id,
+      ...attrDoc.data(),
+      options: optionResults[idx].docs.map((optDoc) => ({
+        id: optDoc.id,
+        ...optDoc.data(),
+      })),
+    }));
+
+    // バリアント + 価格を結合
+    const variants = variantsSnapshot.docs.map((varDoc, idx) => ({
+      id: varDoc.id,
+      ...varDoc.data(),
+      prices: priceResults[idx].docs.map((priceDoc) => ({
+        id: priceDoc.id,
+        ...priceDoc.data(),
+      })),
+    }));
 
     return successResponse({
       id: productDoc.id,

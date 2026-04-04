@@ -49,8 +49,19 @@ export default function LoginPage() {
 
   const onSubmit = async (data: LoginFormValues) => {
     try {
-      await signIn(data.email, data.password);
-      // ログイン成功後はuseEffectのリダイレクト処理に任せる
+      const userCredential = await signIn(data.email, data.password);
+      // カスタムクレームを強制リフレッシュしてロールを取得
+      const tokenResult = await userCredential.user.getIdTokenResult(true);
+      const userRole = tokenResult.claims["role"] as string | undefined;
+
+      // ロールに応じて直接リダイレクト（useEffectを待たずに即遷移）
+      if (userRole === "admin") {
+        router.replace("/admin/dashboard");
+      } else if (userRole === "franchise") {
+        router.replace("/catalog");
+      } else {
+        toast.error("このアカウントにはアクセス権限がありません。管理者にお問い合わせください。");
+      }
     } catch (error: unknown) {
       // Firebase Authのエラーコードに応じたメッセージを表示
       const errorCode = (error as { code?: string }).code;
@@ -68,8 +79,17 @@ export default function LoginPage() {
 
   const onGoogleLogin = async () => {
     try {
-      await signInWithGoogle();
-      // 成功後はuseEffectのリダイレクト処理に任せる
+      const userCredential = await signInWithGoogle();
+      const tokenResult = await userCredential.user.getIdTokenResult(true);
+      const userRole = tokenResult.claims["role"] as string | undefined;
+
+      if (userRole === "admin") {
+        router.replace("/admin/dashboard");
+      } else if (userRole === "franchise") {
+        router.replace("/catalog");
+      } else {
+        toast.error("このアカウントにはアクセス権限がありません。管理者にお問い合わせください。");
+      }
     } catch (error: unknown) {
       toast.error("Google ログインに失敗しました。");
       console.error(error);
@@ -108,10 +128,11 @@ export default function LoginPage() {
             className="text-3xl font-bold text-foreground"
             style={{ fontFamily: "var(--font-heading)" }}
           >
-            発注管理システム
+            加盟店発注システム
           </h1>
-          <p className="text-muted-foreground mt-2 text-sm">
-            フランチャイズ加盟店・本部共通ログイン
+          <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
+            加盟店様専用の注文・管理ポータルです。<br />
+            本部の方は管理者画面よりログインしてください。
           </p>
         </div>
 

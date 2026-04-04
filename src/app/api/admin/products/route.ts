@@ -3,6 +3,9 @@
 
 import { NextRequest } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
+
+export const dynamic = "force-dynamic";
+
 import { requireAdmin, successResponse, errorResponse } from "@/lib/utils/api";
 import { COLLECTIONS } from "@/lib/constants";
 import { z } from "zod";
@@ -14,7 +17,6 @@ const productSchema = z.object({
   name: z.string().min(1, "商品名は必須です"),
   description: z.string().default(""),
   image_url: z.string().nullable().optional(),
-  product_type: z.enum(["apparel", "accessory", "non_apparel"]),
   retail_price: z.number().min(0).nullable().optional(),
   retail_price_tax_incl: z.number().min(0).nullable().optional(),
   sort_order: z.number().int().min(0).default(0),
@@ -24,24 +26,23 @@ export async function GET(request: NextRequest) {
   const { error } = await requireAdmin(request);
   if (error) return error;
 
-  try {
-    const { searchParams } = new URL(request.url);
-    const categoryId = searchParams.get("category_id");
-
-    let query = adminDb
-      .collection(COLLECTIONS.PRODUCTS)
-      .orderBy("sort_order", "asc");
-
-    if (categoryId) {
-      query = adminDb
+    try {
+      const { searchParams } = new URL(request.url);
+      const categoryId = searchParams.get("category_id");
+  
+      let query = adminDb
         .collection(COLLECTIONS.PRODUCTS)
-        .where("category_id", "==", categoryId)
-        .orderBy("sort_order", "asc") as typeof query;
-    }
-
-    const snapshot = await query.get();
-    const products = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    return successResponse(products);
+        .orderBy("sort_order", "asc");
+  
+      if (categoryId) {
+        query = query.where("category_id", "==", categoryId);
+      }
+  
+      const snapshot = await query.get();
+      const products = snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .filter((p: any) => p.is_active !== false);
+      return successResponse(products);
   } catch (err) {
     console.error("商品一覧取得エラー:", err);
     return errorResponse("INTERNAL_ERROR", "データの取得に失敗しました", 500);

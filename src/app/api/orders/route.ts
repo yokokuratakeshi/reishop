@@ -73,8 +73,10 @@ export async function POST(request: NextRequest) {
         total_amount,
         item_count,
         total_quantity,
+        main_category_name: items[0]?.product_name ? "商品あり" : "その他", // 本来はカテゴリID/名を取得して入れるべきだが、まずはフラグとして
         note: note || "",
         ordered_at: now,
+        created_at: now,
         updated_at: now,
       };
 

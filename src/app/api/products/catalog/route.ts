@@ -1,5 +1,5 @@
-// 加盟店向け商品カタログ API
-// ログイン中の加盟店が所属するステージに対応する卸価格を含めて返す
+// 加盟店向け商品カタログ API（最適化版）
+// collectionGroupを使わず、商品単位でPromise.allで並列取得する
 
 import { NextRequest } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
@@ -7,9 +7,7 @@ import { requireFranchise, successResponse, errorResponse } from "@/lib/utils/ap
 import { COLLECTIONS, SUBCOLLECTIONS } from "@/lib/constants";
 import { Product, ProductVariant, VariantPrice } from "@/types";
 
-
 export async function GET(request: NextRequest) {
-  // 加盟店権限チェック
   const { user, error } = await requireFranchise(request);
   if (error) return error;
 
@@ -32,26 +30,27 @@ export async function GET(request: NextRequest) {
     // 商品一覧の取得
     const productsSnapshot = await adminDb
       .collection(COLLECTIONS.PRODUCTS)
-      .where("is_active", "==", true)
       .orderBy("sort_order", "asc")
       .get();
 
+    const activeProducts = productsSnapshot.docs.filter(doc => doc.data().is_active !== false);
+
+    // 全商品のバリアントを並列取得（N+1だが並列実行で高速化）
     const products = await Promise.all(
-      productsSnapshot.docs.map(async (doc) => {
+      activeProducts.map(async (doc) => {
         const product = { id: doc.id, ...doc.data() } as Product;
 
-        // バリアントの取得
+        // バリアント取得
         const variantsSnapshot = await doc.ref
           .collection(SUBCOLLECTIONS.VARIANTS)
           .where("is_active", "==", true)
           .get();
 
-
+        // 全バリアントの価格を並列取得
         const variants = await Promise.all(
           variantsSnapshot.docs.map(async (vDoc) => {
             const variant = { id: vDoc.id, ...vDoc.data() } as ProductVariant;
 
-            // 当該ステージの価格を取得
             const pricesSnapshot = await vDoc.ref
               .collection(SUBCOLLECTIONS.PRICES)
               .where("stage_id", "==", stage_id)
@@ -59,9 +58,8 @@ export async function GET(request: NextRequest) {
               .limit(1)
               .get();
 
-
-            const priceData = pricesSnapshot.empty 
-              ? null 
+            const priceData = pricesSnapshot.empty
+              ? null
               : (pricesSnapshot.docs[0].data() as VariantPrice);
 
             return {
@@ -71,7 +69,6 @@ export async function GET(request: NextRequest) {
           })
         );
 
-        // 有効な価格設定があるバリアントのみを返す（任意：価格未設定は除外するか、0円として出すか）
         return {
           ...product,
           variants: variants.filter(v => (v as any).wholesale_price > 0),
@@ -79,9 +76,7 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    // バリアントが存在し、価格が設定されている商品のみをカタログに表示
     const catalogProducts = products.filter(p => p.variants && p.variants.length > 0);
-
     return successResponse(catalogProducts);
   } catch (err) {
     console.error("カタログ取得エラー:", err);

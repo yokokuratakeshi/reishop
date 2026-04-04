@@ -5,8 +5,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 // 保護するルートの定義
 const ADMIN_ROUTES = ["/admin"];
-const FRANCHISE_ROUTES = ["/catalog", "/cart", "/checkout", "/history"];
-const AUTH_ROUTES = ["/login"];
+const FRANCHISE_ROUTES = ["/catalog", "/cart", "/checkout", "/history", "/orders"];
+const AUTH_ROUTES = ["/login", "/admin-login", "/admin-register"];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -15,19 +15,24 @@ export function middleware(request: NextRequest) {
   // セッションCookieなし = 未認証
   const isAuthenticated = !!sessionCookie;
 
-  // ルートへのアクセスはログイン画面へ
+  // ルートへのアクセスは店舗ログインへ
   if (pathname === "/") {
     if (!isAuthenticated) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
-    // 認証済みならセッション情報に基づいてリダイレクト（後でロール判定を追加）
+    // 認証済みなら適切な初期画面へ（TODO: 本来はロール判定が必要だが、今は一律 /login 経由でリダイレクトされる想定）
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // 管理画面へのアクセス: 未認証なら /login へ
+  // 認証不要ルート（ログイン・登録）はスキップ
+  if (AUTH_ROUTES.some((route) => pathname.startsWith(route))) {
+    return NextResponse.next();
+  }
+
+  // 管理画面へのアクセス: 未認証なら /admin-login へ
   if (ADMIN_ROUTES.some((route) => pathname.startsWith(route))) {
     if (!isAuthenticated) {
-      return NextResponse.redirect(new URL("/login", request.url));
+      return NextResponse.redirect(new URL("/admin-login", request.url));
     }
   }
 
@@ -38,7 +43,6 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // ログイン画面: 認証済みなら /login のまま（ロールに応じたリダイレクトはクライアントで処理）
   return NextResponse.next();
 }
 

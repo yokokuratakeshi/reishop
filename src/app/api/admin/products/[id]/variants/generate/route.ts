@@ -1,5 +1,6 @@
-// バリアント自動生成 API
+// バリアント自動生成 API（追加モード対応）
 // POST: 属性の組み合わせからバリアントを自動生成する
+// 既存バリアントは保持し、新しい組み合わせのみ追加する
 
 import { NextRequest } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
@@ -37,11 +38,19 @@ function cartesianProduct(
   );
 }
 
-// SKUコードを生成（例: 白/M/背面ロゴ → "WHT-M-BACK"）
+// SKUコードを生成
 function generateSkuCode(productId: string, index: number): string {
   const shortId = productId.slice(0, 4).toUpperCase();
   const paddedIndex = String(index + 1).padStart(3, "0");
   return `${shortId}-${paddedIndex}`;
+}
+
+// attribute_valuesを比較用キーに変換（例: {"カラー":"白","サイズ":"M"} → "カラー:白|サイズ:M"）
+function attributeValuesToKey(values: Record<string, string>): string {
+  return Object.entries(values)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}:${v}`)
+    .join("|");
 }
 
 export async function POST(
@@ -59,57 +68,71 @@ export async function POST(
       return errorResponse("VALIDATION_ERROR", parsed.error.message, 422);
     }
 
-    // 既存バリアントを削除してから再生成する
+    // 既存バリアントを取得（削除しない）
     const existingVariants = await adminDb
       .collection(COLLECTIONS.PRODUCTS)
       .doc(productId)
       .collection(SUBCOLLECTIONS.VARIANTS)
       .get();
 
-    const batch = adminDb.batch();
-    existingVariants.docs.forEach((doc) => batch.delete(doc.ref));
-    await batch.commit();
+    // 既存バリアントの属性組み合わせをSetで管理
+    const existingKeys = new Set<string>();
+    existingVariants.docs.forEach((doc) => {
+      const data = doc.data();
+      if (data.attribute_values) {
+        existingKeys.add(attributeValuesToKey(data.attribute_values));
+      }
+    });
 
     // 全属性の組み合わせを生成
     const combinations = cartesianProduct(parsed.data.attributes);
 
-    // バリアントの生成が0件の場合（属性なし商品）は空配列で返す
+    // 属性なし商品の場合
     if (combinations.length === 0 || (combinations.length === 1 && Object.keys(combinations[0]).length === 0)) {
-      // 属性なし商品のバリアント（1件のみ）
-      const variantRef = adminDb
-        .collection(COLLECTIONS.PRODUCTS)
-        .doc(productId)
-        .collection(SUBCOLLECTIONS.VARIANTS)
-        .doc();
+      if (existingVariants.empty) {
+        // 既存がなければ1件作成
+        const variantRef = adminDb
+          .collection(COLLECTIONS.PRODUCTS)
+          .doc(productId)
+          .collection(SUBCOLLECTIONS.VARIANTS)
+          .doc();
 
-      await variantRef.set({
-        sku_code: generateSkuCode(productId, 0),
-        attribute_values: {},
-        is_active: true,
-        created_at: FieldValue.serverTimestamp(),
-        updated_at: FieldValue.serverTimestamp(),
-      });
+        await variantRef.set({
+          sku_code: generateSkuCode(productId, 0),
+          attribute_values: {},
+          is_active: true,
+          created_at: FieldValue.serverTimestamp(),
+          updated_at: FieldValue.serverTimestamp(),
+        });
 
-      // has_variants を更新
-      await adminDb.collection(COLLECTIONS.PRODUCTS).doc(productId).update({
-        has_variants: false,
-        updated_at: FieldValue.serverTimestamp(),
-      });
+        await adminDb.collection(COLLECTIONS.PRODUCTS).doc(productId).update({
+          has_variants: false,
+          updated_at: FieldValue.serverTimestamp(),
+        });
+      }
 
-      return successResponse({ generated_count: 1, variants: [] }, 201);
+      return successResponse({ generated_count: 0, added_count: 0, variants: [] }, 201);
     }
 
-    // バリアントを一括作成
+    // 新しい組み合わせのみをフィルタリング
+    const newCombinations = combinations.filter(
+      (combo) => !existingKeys.has(attributeValuesToKey(combo))
+    );
+
+    // SKUのインデックスは既存数から続きの番号を使う
+    const startIndex = existingVariants.size;
+
+    // 新しいバリアントのみ追加
     const generatedVariants: { id: string; sku_code: string; attribute_values: Record<string, string> }[] = [];
-    for (let i = 0; i < combinations.length; i++) {
-      const combination = combinations[i];
+    for (let i = 0; i < newCombinations.length; i++) {
+      const combination = newCombinations[i];
       const variantRef = adminDb
         .collection(COLLECTIONS.PRODUCTS)
         .doc(productId)
         .collection(SUBCOLLECTIONS.VARIANTS)
         .doc();
 
-      const skuCode = generateSkuCode(productId, i);
+      const skuCode = generateSkuCode(productId, startIndex + i);
       await variantRef.set({
         sku_code: skuCode,
         attribute_values: combination,
@@ -125,14 +148,20 @@ export async function POST(
       });
     }
 
-    // has_variants を true に更新
+    // has_variants を更新
+    const totalVariants = existingVariants.size + newCombinations.length;
     await adminDb.collection(COLLECTIONS.PRODUCTS).doc(productId).update({
-      has_variants: true,
+      has_variants: totalVariants > 1,
       updated_at: FieldValue.serverTimestamp(),
     });
 
     return successResponse(
-      { generated_count: generatedVariants.length, variants: generatedVariants },
+      {
+        generated_count: combinations.length,
+        added_count: newCombinations.length,
+        skipped_count: combinations.length - newCombinations.length,
+        variants: generatedVariants,
+      },
       201
     );
   } catch (err) {

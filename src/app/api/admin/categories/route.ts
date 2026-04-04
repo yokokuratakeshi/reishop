@@ -3,6 +3,9 @@
 
 import { NextRequest } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
+
+export const dynamic = "force-dynamic";
+
 import { requireAdmin, successResponse, errorResponse } from "@/lib/utils/api";
 import { COLLECTIONS } from "@/lib/constants";
 import { z } from "zod";
@@ -10,6 +13,7 @@ import { FieldValue } from "firebase-admin/firestore";
 
 const categorySchema = z.object({
   name: z.string().min(1, "カテゴリ名は必須です"),
+  color: z.string().optional(),
   sort_order: z.number().int().min(0),
 });
 
@@ -17,14 +21,16 @@ export async function GET(request: NextRequest) {
   const { error } = await requireAdmin(request);
   if (error) return error;
 
-  try {
-    const snapshot = await adminDb
-      .collection(COLLECTIONS.CATEGORIES)
-      .orderBy("sort_order", "asc")
-      .get();
-
-    const categories = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    return successResponse(categories);
+    try {
+      const snapshot = await adminDb
+        .collection(COLLECTIONS.CATEGORIES)
+        .orderBy("sort_order", "asc")
+        .get();
+  
+      const categories = snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .filter((c: any) => c.is_active !== false);
+      return successResponse(categories);
   } catch (err) {
     console.error("カテゴリ一覧取得エラー:", err);
     return errorResponse("INTERNAL_ERROR", "データの取得に失敗しました", 500);

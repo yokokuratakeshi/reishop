@@ -3,7 +3,7 @@
 // 加盟店向け商品カタログ画面
 
 import { useState, useEffect } from "react";
-import { Package, Search, Filter } from "lucide-react";
+import { Package, Search, Filter, Minus, Plus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -101,7 +101,32 @@ export default function CatalogPage() {
           <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-20" />
           <p className="text-muted-foreground">該当する商品が見つかりません</p>
         </div>
+      ) : selectedCategory === "all" && !searchText ? (
+        // カテゴリ別グループ表示
+        <div className="space-y-8">
+          {categories.map(cat => {
+            const catProducts = filteredProducts.filter(p => p.category_id === cat.id);
+            if (catProducts.length === 0) return null;
+            return (
+              <div key={cat.id}>
+                <div className="flex items-center gap-2 mb-3">
+                  <h2 className="text-sm font-bold text-foreground">{cat.name}</h2>
+                  <Badge variant="secondary" className="text-[10px] h-4 px-1.5">{catProducts.length}</Badge>
+                </div>
+                <div className="grid grid-cols-1 gap-3">
+                  {catProducts.map(product => (
+                    <ProductCard key={product.id} product={product} onAddToCart={(item) => {
+                      cart.addItem(item);
+                      toast.success("カートに追加しました");
+                    }} />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       ) : (
+        // フラット表示（フィルター/検索時）
         <div className="grid grid-cols-1 gap-4">
           {filteredProducts.map(product => (
             <ProductCard key={product.id} product={product} onAddToCart={(item) => {
@@ -115,15 +140,67 @@ export default function CatalogPage() {
   );
 }
 
+// バリアントから属性名一覧と各属性の選択肢を抽出する
+function extractAttributes(variants: ProductVariant[]): { name: string; options: string[] }[] {
+  if (!variants || variants.length === 0) return [];
+
+  // 全バリアントから属性名を取得（順序を保持するため最初のバリアントのキー順を使う）
+  const firstVariant = variants[0];
+  const attrNames = Object.keys(firstVariant.attribute_values || {});
+
+  return attrNames.map((name) => {
+    // この属性の全選択肢（重複排除・順序保持）
+    const optionSet = new Set<string>();
+    variants.forEach((v) => {
+      const val = v.attribute_values?.[name];
+      if (val) optionSet.add(val);
+    });
+    return { name, options: Array.from(optionSet) };
+  });
+}
+
+// 属性選択から一致するバリアントを検索
+function findMatchingVariant(
+  variants: ProductVariant[],
+  selections: Record<string, string>
+): ProductVariant | undefined {
+  return variants.find((v) =>
+    Object.entries(selections).every(
+      ([key, val]) => v.attribute_values?.[key] === val
+    )
+  );
+}
+
 function ProductCard({ product, onAddToCart }: { product: Product, onAddToCart: (item: any) => void }) {
-  const [selectedVariantId, setSelectedVariantId] = useState<string>(product.variants?.[0]?.id || "");
-  const selectedVariant = product.variants?.find((v: ProductVariant) => v.id === selectedVariantId);
+  const variants = product.variants || [];
+  const attributes = extractAttributes(variants);
+  const hasMultipleVariants = variants.length > 1 && attributes.length > 0;
+
+  // 属性ごとの選択状態（初期値は各属性の最初のオプション）
+  const [selections, setSelections] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    attributes.forEach((attr) => {
+      if (attr.options.length > 0) initial[attr.name] = attr.options[0];
+    });
+    return initial;
+  });
+
+  // 選択に一致するバリアントを取得
+  const selectedVariant = hasMultipleVariants
+    ? findMatchingVariant(variants, selections)
+    : variants[0];
+
+  const [quantity, setQuantity] = useState(1);
+
+  const handleSelectAttribute = (attrName: string, value: string) => {
+    setSelections((prev) => ({ ...prev, [attrName]: value }));
+  };
 
   return (
     <Card className="overflow-hidden border-none shadow-sm bg-card hover:shadow-md transition-shadow rounded-2xl">
       <div className="flex">
         {/* 画像領域 */}
-        <div className="w-28 h-28 relative bg-muted shrink-0">
+        <div className="w-28 min-h-28 relative bg-muted shrink-0">
           {product.image_url ? (
             <Image src={product.image_url} alt={product.name} fill className="object-cover" />
           ) : (
@@ -132,7 +209,7 @@ function ProductCard({ product, onAddToCart }: { product: Product, onAddToCart: 
             </div>
           )}
         </div>
-        
+
         {/* コンテンツ領域 */}
         <div className="flex-1 p-3 flex flex-col justify-between">
           <div>
@@ -141,62 +218,92 @@ function ProductCard({ product, onAddToCart }: { product: Product, onAddToCart: 
                 <p className="text-[10px] text-muted-foreground mb-0.5">{product.category_name}</p>
                 <h3 className="text-sm font-bold text-foreground line-clamp-1">{product.name}</h3>
               </div>
-              <Badge variant="outline" className="text-[9px] px-1 h-4 font-normal">
-                {product.product_type === "apparel" ? "アパレル" : "備品"}
-              </Badge>
             </div>
-            
-            {/* バリアント選択または単一表示 */}
-            <div className="mt-2">
-              {product.variants && product.variants.length > 1 ? (
-                <Select value={selectedVariantId} onValueChange={(v) => v && setSelectedVariantId(v)}>
-                  <SelectTrigger className="h-7 text-xs py-0 rounded-lg">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {product.variants.map(v => (
-                      <SelectItem key={v.id} value={v.id} className="text-xs">
-                        {formatAttributeValues(v.attribute_values)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
+
+            {/* 属性ごとの選択UI */}
+            {hasMultipleVariants ? (
+              <div className="mt-2 space-y-1.5">
+                {attributes.map((attr) => (
+                  <div key={attr.name}>
+                    <p className="text-[10px] text-muted-foreground mb-0.5">{attr.name}</p>
+                    <div className="flex flex-wrap gap-1">
+                      {attr.options.map((option) => {
+                        const isSelected = selections[attr.name] === option;
+                        return (
+                          <button
+                            key={option}
+                            onClick={() => handleSelectAttribute(attr.name, option)}
+                            className={`px-2 py-0.5 rounded-md text-xs border transition-colors ${
+                              isSelected
+                                ? "bg-primary text-primary-foreground border-primary font-bold"
+                                : "bg-background text-foreground border-border hover:border-primary/50"
+                            }`}
+                          >
+                            {option}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-2">
                 <p className="text-xs text-muted-foreground">
                   {selectedVariant ? formatAttributeValues(selectedVariant.attribute_values) : "規格なし"}
                 </p>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
-          <div className="flex items-end justify-between mt-1">
+          <div className="flex items-end justify-between mt-2">
             <div>
               <p className="text-xs text-muted-foreground scale-90 origin-left">卸価格</p>
               <p className="text-base font-bold text-primary">
                 {selectedVariant && "wholesale_price" in selectedVariant ? formatCurrency((selectedVariant as any).wholesale_price) : "---"}
               </p>
             </div>
-            
-            <Button 
-              size="sm" 
-              className="h-8 rounded-full px-4 text-xs font-bold btn-lift"
-              disabled={!selectedVariant}
-              onClick={() => {
-                if (selectedVariant) {
-                  onAddToCart({
-                    product_id: product.id,
-                    product_name: product.name,
-                    variant_id: selectedVariant.id,
-                    sku_code: selectedVariant.sku_code,
-                    attribute_values: selectedVariant.attribute_values,
-                    wholesale_price: (selectedVariant as any).wholesale_price || 0,
-                    quantity: 1
-                  });
-                }
-              }}
-            >
-              カート追加
-            </Button>
+
+            <div className="flex items-center gap-2">
+              {/* 数量調整 */}
+              <div className="flex items-center border border-border rounded-full h-8">
+                <button
+                  className="w-7 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                >
+                  <Minus className="w-3 h-3" />
+                </button>
+                <span className="w-8 text-center text-xs font-bold tabular-nums">{quantity}</span>
+                <button
+                  className="w-7 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => setQuantity((q) => q + 1)}
+                >
+                  <Plus className="w-3 h-3" />
+                </button>
+              </div>
+
+              <Button
+                size="sm"
+                className="h-8 rounded-full px-4 text-xs font-bold btn-lift"
+                disabled={!selectedVariant}
+                onClick={() => {
+                  if (selectedVariant) {
+                    onAddToCart({
+                      product_id: product.id,
+                      product_name: product.name,
+                      variant_id: selectedVariant.id,
+                      sku_code: selectedVariant.sku_code,
+                      attribute_values: selectedVariant.attribute_values,
+                      wholesale_price: (selectedVariant as any).wholesale_price || 0,
+                      quantity,
+                    });
+                    setQuantity(1);
+                  }
+                }}
+              >
+                追加
+              </Button>
+            </div>
           </div>
         </div>
       </div>
