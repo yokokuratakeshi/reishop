@@ -20,20 +20,31 @@ export async function GET(request: NextRequest) {
 
     const orders = ordersSnapshot.docs.map(doc => {
       const data = doc.data();
+      // 日時のパースを極めて堅牢にする
+      let rawDate = data.ordered_at || data.created_at || null;
+      let timestamp = 0;
+      
+      if (rawDate) {
+        if (typeof rawDate.toDate === 'function') {
+          timestamp = rawDate.toDate().getTime();
+        } else if (rawDate instanceof Date) {
+          timestamp = rawDate.getTime();
+        } else if (rawDate.seconds) { // 純粋なJSONオブジェクト（Firestore Timestampのシリアライズ後）
+          timestamp = rawDate.seconds * 1000;
+        } else if (typeof rawDate === 'string') {
+          timestamp = new Date(rawDate).getTime();
+        }
+      }
+
       return {
         id: doc.id,
         ...data,
-        // created_at が欠落している、あるいは Timestamp 型でない場合のフォールバック
-        created_at: data.created_at || null
+        _sort_timestamp: timestamp // ソート用の内部値
       };
     });
 
     // メモリ上で降順（新しい順）に並べ替え
-    orders.sort((a, b) => {
-      const dateA = a.created_at?.toDate ? a.created_at.toDate().getTime() : (a.created_at instanceof Date ? a.created_at.getTime() : 0);
-      const dateB = b.created_at?.toDate ? b.created_at.toDate().getTime() : (b.created_at instanceof Date ? b.created_at.getTime() : 0);
-      return dateB - dateA;
-    });
+    orders.sort((a, b) => b._sort_timestamp - a._sort_timestamp);
 
     return successResponse(orders);
   } catch (err) {
