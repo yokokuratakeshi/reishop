@@ -32,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiGet } from "@/lib/utils/apiClient";
+import { toast } from "sonner";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -76,6 +77,7 @@ export default function DashboardPage() {
         setData(stats);
       } catch (error) {
         console.error("Failed to fetch dashboard stats:", error);
+        toast.error("統計情報の取得に失敗しました");
       } finally {
         setIsLoading(false);
       }

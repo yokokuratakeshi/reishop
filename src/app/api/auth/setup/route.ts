@@ -41,7 +41,7 @@ async function validateToken(token: string): Promise<ValidateError | ValidateSuc
 }
 
 function isValidateError(result: ValidateError | ValidateSuccess): result is ValidateError {
-  return isValidateError(result);
+  return "error" in result;
 }
 
 // GET: トークン検証（公開エンドポイント）

@@ -92,9 +92,9 @@ export default function SetupPage() {
       setStatus("completed");
       toast.success("アカウントが作成されました");
 
-      // カタログページへリダイレクト
+      // カタログページへリダイレクト（フルページ遷移でセッションCookieを確実に送信）
       setTimeout(() => {
-        router.replace("/catalog");
+        window.location.href = "/catalog";
       }, 1500);
     } catch {
       toast.error("アカウント作成に失敗しました。もう一度お試しください。");

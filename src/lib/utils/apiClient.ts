@@ -15,12 +15,21 @@ async function getAuthHeaders(): Promise<HeadersInit> {
   };
 }
 
+// レスポンスのエラーを安全にパースする（非JSONレスポンス対応）
+async function parseErrorResponse(res: Response): Promise<string> {
+  try {
+    const err = await res.json();
+    return err.error?.message ?? `API エラー (${res.status})`;
+  } catch {
+    return `API エラー (${res.status})`;
+  }
+}
+
 export async function apiGet<T>(path: string): Promise<T> {
   const headers = await getAuthHeaders();
   const res = await fetch(path, { headers });
   if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error?.message ?? "API エラー");
+    throw new Error(await parseErrorResponse(res));
   }
   const json = await res.json();
   return json.data as T;
@@ -34,8 +43,7 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error?.message ?? "API エラー");
+    throw new Error(await parseErrorResponse(res));
   }
   const json = await res.json();
   return json.data as T;
@@ -49,8 +57,7 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error?.message ?? "API エラー");
+    throw new Error(await parseErrorResponse(res));
   }
   const json = await res.json();
   return json.data as T;
@@ -64,8 +71,7 @@ export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error?.message ?? "API エラー");
+    throw new Error(await parseErrorResponse(res));
   }
   const json = await res.json();
   return json.data as T;
@@ -75,8 +81,7 @@ export async function apiDelete<T>(path: string): Promise<T> {
   const headers = await getAuthHeaders();
   const res = await fetch(path, { method: "DELETE", headers });
   if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error?.message ?? "API エラー");
+    throw new Error(await parseErrorResponse(res));
   }
   const json = await res.json();
   return json.data as T;

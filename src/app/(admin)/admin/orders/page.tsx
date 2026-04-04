@@ -87,6 +87,11 @@ export default function AdminOrdersPage() {
     fetchOrders();
   }, []);
 
+  // 検索・フィルター変更時は選択をリセット（意図しない一括操作を防ぐ）
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [searchTerm, statusFilter]);
+
   const filteredOrders = orders.filter(order => {
     const matchesSearch = 
       order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) || 

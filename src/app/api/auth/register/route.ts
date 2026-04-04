@@ -3,12 +3,25 @@
 
 import { NextRequest } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
-import { successResponse, errorResponse } from "@/lib/utils/api";
+import { requireAdmin, successResponse, errorResponse } from "@/lib/utils/api";
 import { COLLECTIONS, USER_ROLES } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
+  // 管理者が1人以上いる場合は権限チェック（初回セットアップ時のみ認証不要）
+  const existingAdmins = await adminDb
+    .collection(COLLECTIONS.USERS)
+    .where("role", "==", USER_ROLES.ADMIN)
+    .where("is_active", "==", true)
+    .limit(1)
+    .get();
+
+  if (!existingAdmins.empty) {
+    const { error: authError } = await requireAdmin(request);
+    if (authError) return authError;
+  }
+
   try {
     const { email, password, displayName } = await request.json();
 

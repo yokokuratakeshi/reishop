@@ -5,9 +5,11 @@ import { requireAdmin, successResponse, errorResponse } from "@/lib/utils/api";
 import { COLLECTIONS } from "@/lib/constants";
 import { z } from "zod";
 
+const VALID_ORDER_STATUSES = ["pending", "processing", "shipped", "completed", "cancelled"] as const;
+
 const bulkStatusSchema = z.object({
   orderIds: z.array(z.string()).min(1, "更新対象が選択されていません"),
-  status: z.string().min(1, "ステータスが指定されていません"),
+  status: z.enum(VALID_ORDER_STATUSES, { message: "無効なステータスです" }),
 });
 
 export async function POST(request: NextRequest) {

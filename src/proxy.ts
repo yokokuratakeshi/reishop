@@ -1,14 +1,14 @@
-// ロールベースアクセス制御ミドルウェア
+// ロールベースアクセス制御プロキシ（Next.js 16 proxy.ts 形式）
 // Firebase Auth のセッションCookieを使いサーバーサイドでルートを保護する
 
 import { NextRequest, NextResponse } from "next/server";
 
 // 保護するルートの定義
 const ADMIN_ROUTES = ["/admin"];
-const FRANCHISE_ROUTES = ["/catalog", "/cart", "/checkout", "/history", "/orders"];
+const FRANCHISE_ROUTES = ["/catalog", "/cart", "/history", "/orders", "/invoices", "/manual"];
 const AUTH_ROUTES = ["/login", "/admin-login", "/admin-register"];
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const sessionCookie = request.cookies.get("session")?.value;
 
@@ -20,8 +20,8 @@ export function middleware(request: NextRequest) {
     if (!isAuthenticated) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
-    // 認証済みなら適切な初期画面へ（TODO: 本来はロール判定が必要だが、今は一律 /login 経由でリダイレクトされる想定）
-    return NextResponse.redirect(new URL("/login", request.url));
+    // 認証済みなら /catalog へ（ログイン画面側のuseEffectでロール判定して管理者は /admin/dashboard へ飛ぶ）
+    return NextResponse.redirect(new URL("/catalog", request.url));
   }
 
   // 認証不要ルート（ログイン・登録）はスキップ

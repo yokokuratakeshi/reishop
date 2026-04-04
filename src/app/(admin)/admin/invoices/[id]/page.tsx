@@ -91,9 +91,9 @@ export default function AdminInvoiceDetailPage({ params }: { params: Promise<{ i
           <Skeleton className="h-10 w-64" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Skeleton className="h-32 w-full roudned-xl" />
-          <Skeleton className="h-32 w-full roudned-xl" />
-          <Skeleton className="h-32 w-full roudned-xl" />
+          <Skeleton className="h-32 w-full rounded-xl" />
+          <Skeleton className="h-32 w-full rounded-xl" />
+          <Skeleton className="h-32 w-full rounded-xl" />
         </div>
         <Skeleton className="h-96 w-full rounded-xl" />
       </div>

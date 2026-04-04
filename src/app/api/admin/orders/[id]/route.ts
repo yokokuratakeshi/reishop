@@ -16,8 +16,9 @@ export async function PATCH(
     const { status } = await request.json();
     const { id: orderId } = await params;
 
-    if (!status) {
-      return errorResponse("BAD_REQUEST", "ステータスが指定されていません", 400);
+    const validStatuses = ["pending", "processing", "shipped", "completed", "cancelled"];
+    if (!status || !validStatuses.includes(status)) {
+      return errorResponse("BAD_REQUEST", "無効なステータスです", 400);
     }
 
     const orderRef = adminDb.collection(COLLECTIONS.ORDERS).doc(orderId);

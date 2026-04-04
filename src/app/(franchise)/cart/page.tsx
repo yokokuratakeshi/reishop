@@ -28,7 +28,7 @@ export default function CartPage() {
   if (!mounted) return null;
 
   const handleCheckout = async () => {
-    if (cart.items.length === 0) return;
+    if (cart.items.length === 0 || isSubmitting) return; // ダブルクリック防止
 
     setIsSubmitting(true);
     try {

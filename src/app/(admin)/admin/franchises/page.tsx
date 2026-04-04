@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Store, Search, Download, Link2, Copy, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, Store, Search, Download, Link2, Copy, Check, ShieldCheck } from "lucide-react";
 import { CsvImportButton } from "@/components/admin/csv-import-button";
 import { Franchise, Stage } from "@/types";
 import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/utils/apiClient";
@@ -49,10 +49,8 @@ export default function FranchisesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingFranchise, setEditingFranchise] = useState<Franchise | null>(null);
   const [searchText, setSearchText] = useState("");
-  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
-  const [inviteUrl, setInviteUrl] = useState("");
-  const [inviteCopied, setInviteCopied] = useState(false);
-  const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
+  const [isAdminDialogOpen, setIsAdminDialogOpen] = useState(false);
+  const [isAdminSubmitting, setIsAdminSubmitting] = useState(false);
 
   const {
     register,
@@ -155,29 +153,34 @@ export default function FranchisesPage() {
     }
   };
 
-  const handleGenerateInvite = async (franchise: Franchise) => {
-    setIsGeneratingInvite(true);
-    try {
-      const res = await apiPost<{ token: string; url: string }>(
-        `/api/admin/franchises/${franchise.id}/invite`,
-        {}
-      );
-      const fullUrl = `${window.location.origin}${res.url}`;
-      setInviteUrl(fullUrl);
-      setInviteCopied(false);
-      setInviteDialogOpen(true);
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "招待リンクの生成に失敗しました");
-    } finally {
-      setIsGeneratingInvite(false);
-    }
-  };
+  const handleAdminRegister = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsAdminSubmitting(true);
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get("admin-email") as string;
+    const password = formData.get("admin-password") as string;
+    const displayName = formData.get("admin-name") as string;
 
-  const handleCopyInviteUrl = async () => {
-    await navigator.clipboard.writeText(inviteUrl);
-    setInviteCopied(true);
-    toast.success("招待リンクをコピーしました");
-    setTimeout(() => setInviteCopied(false), 2000);
+    if (!email || !password || !displayName) {
+      toast.error("すべての項目を入力してください");
+      setIsAdminSubmitting(false);
+      return;
+    }
+    if (password.length < 6) {
+      toast.error("パスワードは6文字以上で入力してください");
+      setIsAdminSubmitting(false);
+      return;
+    }
+
+    try {
+      await apiPost("/api/auth/register", { email, password, displayName });
+      toast.success("管理者アカウントを作成しました");
+      setIsAdminDialogOpen(false);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "管理者の作成に失敗しました");
+    } finally {
+      setIsAdminSubmitting(false);
+    }
   };
 
   const filteredFranchises = franchises.filter(
@@ -213,6 +216,10 @@ export default function FranchisesPage() {
               };
             }}
           />
+          <Button variant="outline" onClick={() => setIsAdminDialogOpen(true)}>
+            <ShieldCheck className="w-4 h-4 mr-2" />
+            管理者を追加
+          </Button>
           <Button onClick={openCreateDialog} className="bg-primary hover:bg-primary/90 btn-lift">
             <Plus className="w-4 h-4 mr-2" />
             加盟店を追加
@@ -271,18 +278,6 @@ export default function FranchisesPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  {!f.auth_uid && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-muted-foreground hover:text-primary"
-                      onClick={() => handleGenerateInvite(f)}
-                      disabled={isGeneratingInvite}
-                      title="招待リンクを発行"
-                    >
-                      <Link2 className="w-4 h-4" />
-                    </Button>
-                  )}
                   <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick={() => openEditDialog(f)}>
                     <Pencil className="w-4 h-4" />
                   </Button>
@@ -296,36 +291,7 @@ export default function FranchisesPage() {
         </div>
       )}
 
-      {/* 招待リンクダイアログ */}
-      <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>招待リンクを発行しました</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <p className="text-sm text-muted-foreground">
-              以下のリンクを加盟店に共有してください。リンクは7日間有効です。
-            </p>
-            <div className="flex items-center gap-2">
-              <Input value={inviteUrl} readOnly className="text-xs" />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleCopyInviteUrl}
-                className="shrink-0"
-              >
-                {inviteCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-              </Button>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>閉じる</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ダイアログ */}
+      {/* 加盟店追加・編集ダイアログ */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -400,6 +366,38 @@ export default function FranchisesPage() {
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>キャンセル</Button>
               <Button type="submit" disabled={isSubmitting} className="bg-primary hover:bg-primary/90">
                 {isSubmitting ? "保存中..." : "保存"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* 管理者追加ダイアログ */}
+      <Dialog open={isAdminDialogOpen} onOpenChange={setIsAdminDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-primary" />
+              管理者アカウントを追加
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleAdminRegister} className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="admin-name">表示名 *</Label>
+              <Input id="admin-name" name="admin-name" placeholder="例: 山田 太郎" required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="admin-email">メールアドレス *</Label>
+              <Input id="admin-email" name="admin-email" type="email" placeholder="admin@example.com" required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="admin-password">パスワード *</Label>
+              <Input id="admin-password" name="admin-password" type="password" placeholder="6文字以上" required minLength={6} />
+            </div>
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" onClick={() => setIsAdminDialogOpen(false)}>キャンセル</Button>
+              <Button type="submit" disabled={isAdminSubmitting} className="bg-primary hover:bg-primary/90">
+                {isAdminSubmitting ? "作成中..." : "作成"}
               </Button>
             </DialogFooter>
           </form>

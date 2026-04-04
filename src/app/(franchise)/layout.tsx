@@ -18,11 +18,13 @@ export default function FranchiseLayout({
   const [cartCount, setCartCount] = useState(0);
   const [storeName, setStoreName] = useState<string>("");
 
-  // ハイドレーションエラー防止のためマウント後に取得
+  // カート数量はカート変更時に更新（ハイドレーションエラー防止のためマウント後に取得）
   useEffect(() => {
     setCartCount(cart.totalQuantity());
-    
-    // 店舗名の取得
+  }, [cart]);
+
+  // 店舗名はマウント時のみ取得（カート変更のたびにAPIを叩かないよう分離）
+  useEffect(() => {
     const fetchProfile = async () => {
       try {
         const res = await apiGet<any>("/api/franchise/profile");
@@ -34,7 +36,7 @@ export default function FranchiseLayout({
       }
     };
     fetchProfile();
-  }, [cart]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
