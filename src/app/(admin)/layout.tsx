@@ -20,7 +20,7 @@ export default function AdminLayout({
     { label: "カテゴリ管理", href: "/admin/categories" },
     { label: "ステージ管理", href: "/admin/stages" },
     { label: "加盟店管理", href: "/admin/franchises" },
-    { label: "発注一覧", href: "/admin/orders" },
+    { label: "受注一覧", href: "/admin/orders" },
     { label: "請求書管理", href: "/admin/invoices" },
     { label: "マニュアル", href: "/admin/manual" },
   ];
@@ -41,7 +41,7 @@ export default function AdminLayout({
             >
               FC
             </div>
-            <span className="font-semibold text-white text-sm">発注管理システム</span>
+            <span className="font-semibold text-white text-sm">受注管理システム</span>
           </div>
         </div>
         <nav className="flex-1 p-4 space-y-1">

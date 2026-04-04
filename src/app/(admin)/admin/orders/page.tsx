@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
 import { 
   Select, 
   SelectContent, 
@@ -65,15 +66,18 @@ export default function AdminOrdersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
 
   const fetchOrders = async () => {
     try {
       setIsLoading(true);
       const data = await apiGet<AdminOrder[]>("/api/admin/orders");
       setOrders(data);
+      setSelectedIds([]); // 取得後は選択をリセット
     } catch (error) {
       console.error("Failed to fetch orders:", error);
-      toast.error("注文一覧の取得に失敗しました");
+      toast.error("受注一覧の取得に失敗しました");
     } finally {
       setIsLoading(false);
     }
@@ -91,15 +95,52 @@ export default function AdminOrdersPage() {
     return matchesSearch && matchesStatus;
   });
 
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filteredOrders.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredOrders.map(o => o.id));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkStatusUpdate = async (newStatus: string) => {
+    if (selectedIds.length === 0) return;
+    
+    if (!confirm(`${selectedIds.length}件の受注ステータスを「${statusMap[newStatus].label}」に変更しますか？`)) {
+      return;
+    }
+
+    try {
+      setIsBulkUpdating(true);
+      await apiPost("/api/admin/orders/bulk-status", {
+        orderIds: selectedIds,
+        status: newStatus
+      });
+      toast.success(`${selectedIds.length}件のステータスを更新しました`);
+      fetchOrders();
+    } catch (error) {
+      console.error("Bulk update failed:", error);
+      toast.error("一括更新に失敗しました");
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
             <ClipboardList className="w-6 h-6 text-primary" />
-            発注管理
+            受注管理
           </h1>
-          <p className="text-muted-foreground">全加盟店からの注文状況を確認・管理します</p>
+          <p className="text-muted-foreground">全加盟店からの受注状況を確認・管理します</p>
         </div>
         <div className="flex items-center gap-2">
           <CsvImportButton
@@ -119,6 +160,43 @@ export default function AdminOrdersPage() {
           />
         </div>
       </div>
+
+      {/* 一括操作ツールバー */}
+      {selectedIds.length > 0 && (
+        <Card className="bg-primary/5 border-primary/20 shadow-md animate-in fade-in slide-in-from-top-2">
+          <CardContent className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Badge variant="secondary" className="bg-primary text-primary-foreground px-3 py-1">
+                {selectedIds.length} 件選択中
+              </Badge>
+              <p className="text-sm font-medium">ステータスを一括変更:</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(statusMap).map(([key, value]) => (
+                <Button 
+                  key={key}
+                  size="sm" 
+                  variant="outline" 
+                  className={cn("h-8 text-[11px] font-bold border-muted-foreground/20 hover:bg-white", value.color)}
+                  disabled={isBulkUpdating}
+                  onClick={() => handleBulkStatusUpdate(key)}
+                >
+                  {value.label}にする
+                </Button>
+              ))}
+              <Separator orientation="vertical" className="h-8 mx-1 hidden md:block" />
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                className="h-8 text-xs text-muted-foreground"
+                onClick={() => setSelectedIds([])}
+              >
+                解除
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="border-none shadow-sm bg-card">
         <CardHeader className="pb-3 px-6 pt-6">
@@ -155,6 +233,14 @@ export default function AdminOrdersPage() {
             <Table>
               <TableHeader className="bg-muted/30">
                 <TableRow className="hover:bg-transparent border-border/50">
+                  <TableHead className="w-[50px] py-4 pl-6">
+                    <input 
+                      type="checkbox" 
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                      checked={selectedIds.length > 0 && selectedIds.length === filteredOrders.length}
+                      onChange={toggleSelectAll}
+                    />
+                  </TableHead>
                   <TableHead className="w-[150px] font-bold py-4">注文番号</TableHead>
                   <TableHead className="font-bold py-4 text-center">加盟店</TableHead>
                   <TableHead className="font-bold py-4 text-center">注文日時</TableHead>
@@ -167,6 +253,7 @@ export default function AdminOrdersPage() {
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
+                      <TableCell className="pl-6"><Skeleton className="h-4 w-4" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-32 mx-auto" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-32 mx-auto" /></TableCell>
@@ -177,10 +264,10 @@ export default function AdminOrdersPage() {
                   ))
                 ) : filteredOrders.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-64 text-center">
+                    <TableCell colSpan={7} className="h-64 text-center">
                       <div className="flex flex-col items-center justify-center text-muted-foreground opacity-50">
                         <ClipboardList className="w-12 h-12 mb-2" />
-                        <p>注文データが見つかりません</p>
+                        <p>受注データが見つかりません</p>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -188,9 +275,24 @@ export default function AdminOrdersPage() {
                   filteredOrders.map((order) => {
                     const status = statusMap[order.status] || { label: order.status, color: "bg-gray-100", icon: AlertCircle };
                     const StatusIcon = status.icon;
+                    const isSelected = selectedIds.includes(order.id);
                     
                     return (
-                      <TableRow key={order.id} className="hover:bg-muted/30 transition-colors border-border/30">
+                      <TableRow 
+                        key={order.id} 
+                        className={cn(
+                          "transition-colors border-border/30", 
+                          isSelected ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-muted/30"
+                        )}
+                      >
+                        <TableCell className="pl-6 py-4">
+                          <input 
+                            type="checkbox" 
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                            checked={isSelected}
+                            onChange={() => toggleSelect(order.id)}
+                          />
+                        </TableCell>
                         <TableCell className="font-medium font-mono text-xs">{order.order_number}</TableCell>
                         <TableCell className="text-center">
                           <span className="font-bold text-sm">{order.franchise_name}</span>
