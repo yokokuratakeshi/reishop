@@ -16,10 +16,24 @@ export default function FranchiseLayout({
   const cart = useCart();
   const pathname = usePathname();
   const [cartCount, setCartCount] = useState(0);
+  const [storeName, setStoreName] = useState<string>("");
 
   // ハイドレーションエラー防止のためマウント後に取得
   useEffect(() => {
     setCartCount(cart.totalQuantity());
+    
+    // 店舗名の取得
+    const fetchProfile = async () => {
+      try {
+        const res = await apiGet<any>("/api/franchise/profile");
+        if (res && res.name) {
+          setStoreName(res.name);
+        }
+      } catch (err) {
+        console.error("Profile fetch error:", err);
+      }
+    };
+    fetchProfile();
   }, [cart]);
 
   return (
@@ -38,7 +52,7 @@ export default function FranchiseLayout({
             </span>
           </Link>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <Link 
               href="/catalog" 
               className={cn("p-2 rounded-full transition-colors", pathname === "/catalog" ? "text-primary bg-primary/10" : "text-muted-foreground hover:bg-muted")}
@@ -68,17 +82,24 @@ export default function FranchiseLayout({
               )}
             </Link>
 
-            <button 
-              onClick={async () => {
-                const { logout } = await import("@/lib/firebase/auth");
-                await logout();
-                window.location.href = "/login";
-              }}
-              className="p-2 rounded-full text-muted-foreground hover:bg-muted transition-colors"
-              title="ログアウト"
-            >
-              <User className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-1 pl-2 border-l border-border/50">
+              {storeName && (
+                <span className="text-[10px] font-medium text-muted-foreground truncate max-w-[80px]">
+                  {storeName}
+                </span>
+              )}
+              <button 
+                onClick={async () => {
+                  const { logout } = await import("@/lib/firebase/auth");
+                  await logout();
+                  window.location.href = "/login";
+                }}
+                className="p-2 rounded-full text-muted-foreground hover:bg-muted transition-colors"
+                title="ログアウト"
+              >
+                <User className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </div>
       </header>
