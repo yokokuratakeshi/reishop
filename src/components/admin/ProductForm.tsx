@@ -87,7 +87,7 @@ function SortableVariantRow({
   variant: ProductVariant;
   stages: Stage[];
   prices: Record<string, Record<string, number>>;
-  updateVariant: (variantId: string, data: { sku_code?: string; is_active?: boolean }) => void;
+  updateVariant: (variantId: string, data: { sku_code?: string; is_active?: boolean; retail_price?: number | null }) => void;
   updatePrice: (variantId: string, stageId: string, value: number) => void;
   removeVariant: (variantId: string) => void;
 }) {
@@ -160,6 +160,24 @@ function SortableVariantRow({
             {variant.is_active === false ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
           </Button>
         </div>
+      </td>
+      {/* 販売定価（バリアント別） */}
+      <td className="py-2 px-3 text-center bg-amber-50/30">
+        <Input
+          type="number"
+          min={0}
+          placeholder="0"
+          className="w-24 mx-auto text-center tabular-nums"
+          defaultValue={variant.retail_price ?? ""}
+          onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
+          onBlur={(e) => {
+            const raw = e.target.value.trim();
+            const next = raw === "" ? null : Number(raw);
+            if (next !== null && (isNaN(next) || next < 0)) return;
+            if (next === (variant.retail_price ?? null)) return;
+            updateVariant(variant.id, { retail_price: next });
+          }}
+        />
       </td>
       {stages.map((stage) => (
         <td key={stage.id} className="py-2 px-3 text-center">
@@ -460,8 +478,11 @@ export default function ProductFormPage({ productId }: ProductFormPageProps) {
     }
   };
 
-  // --- バリアント更新（SKU・有効/無効） ---
-  const updateVariant = async (variantId: string, data: { sku_code?: string; is_active?: boolean }) => {
+  // --- バリアント更新（SKU・有効/無効・販売定価） ---
+  const updateVariant = async (
+    variantId: string,
+    data: { sku_code?: string; is_active?: boolean; retail_price?: number | null }
+  ) => {
     if (!savedProductId) return;
     try {
       await apiPatch(`/api/admin/products/${savedProductId}/variants/${variantId}`, data);
@@ -830,6 +851,9 @@ export default function ProductFormPage({ productId }: ProductFormPageProps) {
                   <tr className="border-b border-border">
                     <th className="text-left py-2 pr-4 font-medium text-muted-foreground">
                       バリアント（属性値）
+                    </th>
+                    <th className="text-center py-2 px-3 font-medium text-amber-700 min-w-28 bg-amber-50/50">
+                      販売定価
                     </th>
                     {stages.map((stage) => (
                       <th key={stage.id} className="text-center py-2 px-3 font-medium text-muted-foreground min-w-28">

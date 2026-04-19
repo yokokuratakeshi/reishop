@@ -116,6 +116,7 @@ export interface ProductVariant {
   attribute_values: Record<string, string>; // { "カラー": "白", "サイズ": "M" }
   is_active: boolean;
   sort_order?: number; // 表示順（ドラッグ＆ドロップで並び替え可能）
+  retail_price?: number | null; // バリアント別の販売定価（未設定時は商品全体の retail_price を使用）
   created_at: Timestamp;
   updated_at: Timestamp;
   prices?: VariantPrice[]; // フロント側で結合する場合

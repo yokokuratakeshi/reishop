@@ -68,6 +68,10 @@ export async function POST(
       return errorResponse("VALIDATION_ERROR", parsed.error.message, 422);
     }
 
+    // 商品全体の retail_price を取得し、新規バリアントのデフォルト販売定価として使う
+    const productSnap = await adminDb.collection(COLLECTIONS.PRODUCTS).doc(productId).get();
+    const defaultRetailPrice = (productSnap.data()?.retail_price as number | null | undefined) ?? null;
+
     // 既存バリアントを取得（削除しない）
     const existingVariants = await adminDb
       .collection(COLLECTIONS.PRODUCTS)
@@ -102,6 +106,7 @@ export async function POST(
           attribute_values: {},
           is_active: true,
           sort_order: 0,
+          retail_price: defaultRetailPrice,
           created_at: FieldValue.serverTimestamp(),
           updated_at: FieldValue.serverTimestamp(),
         });
@@ -139,6 +144,7 @@ export async function POST(
         attribute_values: combination,
         is_active: true,
         sort_order: startIndex + i,
+        retail_price: defaultRetailPrice,
         created_at: FieldValue.serverTimestamp(),
         updated_at: FieldValue.serverTimestamp(),
       });

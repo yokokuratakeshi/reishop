@@ -11,6 +11,7 @@ import { FieldValue } from "firebase-admin/firestore";
 const updateSchema = z.object({
   sku_code: z.string().min(1).optional(),
   is_active: z.boolean().optional(),
+  retail_price: z.number().min(0).nullable().optional(),
 });
 
 export async function PATCH(
@@ -49,6 +50,9 @@ export async function PATCH(
     }
     if (parsed.data.is_active !== undefined) {
       updateData.is_active = parsed.data.is_active;
+    }
+    if (parsed.data.retail_price !== undefined) {
+      updateData.retail_price = parsed.data.retail_price;
     }
 
     await variantRef.update(updateData);
