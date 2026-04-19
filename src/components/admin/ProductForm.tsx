@@ -172,6 +172,8 @@ function SortableVariantRow({
           className="w-24 mx-auto text-center tabular-nums"
           defaultValue={variant.retail_price ?? ""}
           onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
+          // フォーカス時に全選択して即時上書き入力できるようにする
+          onFocus={(e) => e.target.select()}
           onBlur={(e) => {
             const raw = e.target.value.trim();
             const next = raw === "" ? null : Number(raw);
@@ -191,6 +193,8 @@ function SortableVariantRow({
             value={prices[variant.id]?.[stage.id] ?? ""}
             onChange={(e) => updatePrice(variant.id, stage.id, Number(e.target.value))}
             onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
+            // フォーカス時に全選択して即時上書き入力できるようにする
+            onFocus={(e) => e.target.select()}
           />
         </td>
       ))}
@@ -821,6 +825,7 @@ export default function ProductFormPage({ productId }: ProductFormPageProps) {
                   value={bulkPrice}
                   onChange={(e) => setBulkPrice(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
+                  onFocus={(e) => e.target.select()}
                 />
                 <span className="text-sm text-muted-foreground">→</span>
                 <div className="flex flex-wrap gap-1.5">
