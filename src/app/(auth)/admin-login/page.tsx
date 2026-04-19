@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { signIn } from "@/lib/firebase/auth";
 import { useForm } from "react-hook-form";
@@ -22,8 +21,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function AdminLoginPage() {
-  const router = useRouter();
-  const { user, role, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
 
   const {
     register,
@@ -33,11 +31,41 @@ export default function AdminLoginPage() {
     resolver: zodResolver(loginSchema),
   });
 
+  // 既ログイン時の自動遷移
+  // Firebase Clientは認証済みだがサーバーセッションCookieが切れている場合に
+  // proxy.ts との間でリダイレクトループが発生するのを防ぐため、
+  // 先にサーバーセッションを再作成してから遷移する。
   useEffect(() => {
-    if (!isLoading && user && role === "admin") {
-      window.location.assign("/admin/dashboard");
-    }
-  }, [user, role, isLoading, router]);
+    if (isLoading || !user) return;
+
+    (async () => {
+      try {
+        // 最新ロールを取得
+        const tokenResult = await user.getIdTokenResult(true);
+        const userRole = tokenResult.claims["role"] as string | undefined;
+
+        // 管理者でない場合はクライアント側もサインアウトしてループを止める
+        if (userRole !== "admin") {
+          const { logout } = await import("@/lib/firebase/auth");
+          await logout();
+          toast.error("管理者権限がありません。");
+          return;
+        }
+
+        // サーバーセッションCookieを再作成
+        const idToken = await user.getIdToken(true);
+        await fetch("/api/auth/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken }),
+        });
+
+        window.location.assign("/admin/dashboard");
+      } catch (err) {
+        console.error("セッション復旧エラー:", err);
+      }
+    })();
+  }, [user, isLoading]);
 
   const onSubmit = async (data: LoginFormValues) => {
     try {

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { signIn, signInWithGoogle } from "@/lib/firebase/auth";
 import { useForm } from "react-hook-form";
@@ -22,8 +21,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  const router = useRouter();
-  const { user, role, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
 
   const {
     register,
@@ -34,18 +32,43 @@ export default function LoginPage() {
   });
 
   // ログイン済みの場合はロールに応じてリダイレクト
+  // Firebase Client は認証済みだがサーバーセッション Cookie が切れている場合、
+  // proxy.ts との間でリダイレクトループが発生するため、遷移前にサーバーセッションを再作成する。
   useEffect(() => {
-    if (!isLoading && user) {
-      if (role === "admin") {
-        window.location.assign("/admin/dashboard");
-      } else if (role === "franchise") {
-        window.location.assign("/catalog");
-      } else {
-        // ロールが設定されていない場合（Google ログイン後の未登録など）
-        toast.error("このアカウントにはアクセス権限がありません。管理者にお問い合わせください。");
+    if (isLoading || !user) return;
+
+    (async () => {
+      try {
+        // 最新ロールを取得
+        const tokenResult = await user.getIdTokenResult(true);
+        const userRole = tokenResult.claims["role"] as string | undefined;
+
+        // ロール未設定の場合はクライアント側もサインアウトしてループを止める
+        if (userRole !== "admin" && userRole !== "franchise") {
+          const { logout } = await import("@/lib/firebase/auth");
+          await logout();
+          toast.error("このアカウントにはアクセス権限がありません。管理者にお問い合わせください。");
+          return;
+        }
+
+        // サーバーセッション Cookie を再作成
+        const idToken = await user.getIdToken(true);
+        await fetch("/api/auth/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken }),
+        });
+
+        if (userRole === "admin") {
+          window.location.assign("/admin/dashboard");
+        } else {
+          window.location.assign("/catalog");
+        }
+      } catch (err) {
+        console.error("セッション復旧エラー:", err);
       }
-    }
-  }, [user, role, isLoading, router]);
+    })();
+  }, [user, isLoading]);
 
   const onSubmit = async (data: LoginFormValues) => {
     try {
