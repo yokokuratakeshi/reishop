@@ -653,8 +653,11 @@ export default function ProductFormPage({ productId }: ProductFormPageProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="retail-price">販売定価（円）</Label>
+                <Label htmlFor="retail-price">販売定価 既定値（円）</Label>
                 <Input id="retail-price" type="number" min={0} placeholder="6000" {...register("retail_price", { valueAsNumber: true })} />
+                <p className="text-xs text-muted-foreground">
+                  ※ 新しくバリアントを生成する際に、各バリアントの「販売定価」列に自動入力される初期値です。生成後はバリアントごとに個別編集できます。
+                </p>
               </div>
 
               <div className="space-y-2 md:col-span-2">
