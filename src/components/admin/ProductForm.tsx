@@ -163,7 +163,9 @@ function SortableVariantRow({
       </td>
       {/* 販売定価（バリアント別） */}
       <td className="py-2 px-3 text-center bg-amber-50/30">
+        {/* keyに retail_price を含め、サーバ反映時に最新値で再マウントされるようにする */}
         <Input
+          key={`retail-${variant.id}-${variant.retail_price ?? "null"}`}
           type="number"
           min={0}
           placeholder="0"
@@ -429,21 +431,32 @@ export default function ProductFormPage({ productId }: ProductFormPageProps) {
         }
       );
 
-      // 最新のバリアントを取得
-      const productDetail = await apiGet<{ variants: ProductVariant[] }>(
+      // 最新のバリアントを取得（prices 付き）
+      const productDetail = await apiGet<{ variants: (ProductVariant & { prices?: VariantPrice[] })[] }>(
         `/api/admin/products/${savedProductId}`
       );
       setVariants(productDetail.variants ?? []);
 
-      // 価格マトリクスを初期化
-      const initialPrices: Record<string, Record<string, number>> = {};
+      // 価格マトリクスを再構築
+      // ・DBに保存済みの価格はそのまま復元
+      // ・未保存（DBに無い）分は、現在の画面に入っている値（prevPrices）を優先
+      //   → 「入力したけど保存前にバリアント追加した」場合の値を失わない
+      const prevPrices = prices;
+      const rebuilt: Record<string, Record<string, number>> = {};
       (productDetail.variants ?? []).forEach((v) => {
-        initialPrices[v.id] = {};
+        rebuilt[v.id] = {};
         stages.forEach((s) => {
-          initialPrices[v.id][s.id] = 0;
+          const priceObj = v.prices?.find((p) => p.stage_id === s.id);
+          if (priceObj) {
+            rebuilt[v.id][s.id] = priceObj.wholesale_price;
+          } else if (prevPrices[v.id]?.[s.id] !== undefined) {
+            rebuilt[v.id][s.id] = prevPrices[v.id][s.id];
+          } else {
+            rebuilt[v.id][s.id] = 0;
+          }
         });
       });
-      setPrices(initialPrices);
+      setPrices(rebuilt);
 
       if (result.added_count > 0) {
         toast.success(`${result.added_count}件のバリアントを追加しました${result.skipped_count > 0 ? `（${result.skipped_count}件は既存のためスキップ）` : ""}`);

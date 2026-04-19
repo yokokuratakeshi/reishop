@@ -4,9 +4,10 @@
 import { NextRequest } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { requireAdmin, successResponse, errorResponse } from "@/lib/utils/api";
-import { COLLECTIONS } from "@/lib/constants";
+import { COLLECTIONS, CACHE_TAGS } from "@/lib/constants";
 import { z } from "zod";
 import { FieldValue } from "firebase-admin/firestore";
+import { revalidateTag } from "next/cache";
 
 const reorderSchema = z.array(
   z.object({
@@ -36,6 +37,7 @@ export async function PATCH(request: NextRequest) {
     });
 
     await batch.commit();
+    revalidateTag(CACHE_TAGS.CATEGORIES, "max");
 
     return successResponse({ updated: items.length });
   } catch (err) {

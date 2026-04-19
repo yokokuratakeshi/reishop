@@ -1,13 +1,14 @@
 // ステージ（期）管理 API
 // GET: 一覧取得 / POST: 新規追加
+//
+// パフォーマンス: unstable_cache で 5 分キャッシュし、更新時に revalidateTag で無効化
 
 import { NextRequest } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
-
-export const dynamic = "force-dynamic";
+import { unstable_cache, revalidateTag } from "next/cache";
 
 import { requireAdmin, successResponse, errorResponse } from "@/lib/utils/api";
-import { COLLECTIONS } from "@/lib/constants";
+import { COLLECTIONS, CACHE_TAGS } from "@/lib/constants";
 import { z } from "zod";
 import { FieldValue } from "firebase-admin/firestore";
 
@@ -16,20 +17,27 @@ const stageSchema = z.object({
   sort_order: z.number().int().min(0),
 });
 
+const getStagesCached = unstable_cache(
+  async () => {
+    const snapshot = await adminDb
+      .collection(COLLECTIONS.STAGES)
+      .orderBy("sort_order", "asc")
+      .get();
+    return snapshot.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; is_active?: boolean; [key: string]: unknown }))
+      .filter((s) => s.is_active !== false);
+  },
+  ["stages-all"],
+  { revalidate: 300, tags: [CACHE_TAGS.STAGES] }
+);
+
 export async function GET(request: NextRequest) {
   const { error } = await requireAdmin(request);
   if (error) return error;
 
-    try {
-      const snapshot = await adminDb
-        .collection(COLLECTIONS.STAGES)
-        .orderBy("sort_order", "asc")
-        .get();
-  
-      const stages = snapshot.docs
-        .map((doc) => ({ id: doc.id, ...doc.data() }))
-        .filter((s: any) => s.is_active !== false);
-      return successResponse(stages);
+  try {
+    const stages = await getStagesCached();
+    return successResponse(stages);
   } catch (err) {
     console.error("ステージ一覧取得エラー:", err);
     return errorResponse("INTERNAL_ERROR", "データの取得に失敗しました", 500);
@@ -54,6 +62,8 @@ export async function POST(request: NextRequest) {
       created_at: now,
       updated_at: now,
     });
+
+    revalidateTag(CACHE_TAGS.STAGES, "max");
 
     return successResponse({ id: docRef.id, ...parsed.data, is_active: true }, 201);
   } catch (err) {

@@ -4,9 +4,10 @@
 import { NextRequest } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { requireAdmin, successResponse, errorResponse } from "@/lib/utils/api";
-import { COLLECTIONS } from "@/lib/constants";
+import { COLLECTIONS, CACHE_TAGS } from "@/lib/constants";
 import { z } from "zod";
 import { FieldValue } from "firebase-admin/firestore";
+import { revalidateTag } from "next/cache";
 
 const updateCategorySchema = z.object({
   name: z.string().min(1).optional(),
@@ -35,6 +36,8 @@ export async function PUT(
       updated_at: FieldValue.serverTimestamp(),
     });
 
+    revalidateTag(CACHE_TAGS.CATEGORIES, "max");
+
     return successResponse({ id, ...parsed.data });
   } catch (err) {
     console.error("カテゴリ更新エラー:", err);
@@ -55,6 +58,7 @@ export async function DELETE(
       is_active: false,
       updated_at: FieldValue.serverTimestamp(),
     });
+    revalidateTag(CACHE_TAGS.CATEGORIES, "max");
     return successResponse({ id, deleted: true });
   } catch (err) {
     console.error("カテゴリ削除エラー:", err);

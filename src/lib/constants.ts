@@ -56,6 +56,17 @@ export const INVOICE_STATUS_LABELS: Record<string, string> = {
   paid: "支払済",
 };
 
+// Next.js キャッシュタグ
+// unstable_cache / revalidateTag で使用し、マスタ更新時に該当キャッシュを無効化する
+export const CACHE_TAGS = {
+  CATEGORIES: "categories",
+  STAGES: "stages",
+  PRODUCTS: "products",
+  FRANCHISES: "franchises",
+  PRODUCT_DETAIL: "product-detail",
+  CATALOG: "catalog",
+} as const;
+
 // 消費税率（デフォルト）
 export const DEFAULT_TAX_RATE = 0.1;
 
