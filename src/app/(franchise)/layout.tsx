@@ -94,7 +94,7 @@ export default function FranchiseLayout({
                 onClick={async () => {
                   const { logout } = await import("@/lib/firebase/auth");
                   await logout();
-                  window.location.href = "/login";
+                  window.location.assign("/login");
                 }}
                 className="p-2 rounded-full text-muted-foreground hover:bg-muted transition-colors"
                 title="ログアウト"
@@ -110,4 +110,3 @@ export default function FranchiseLayout({
     </div>
   );
 }
-

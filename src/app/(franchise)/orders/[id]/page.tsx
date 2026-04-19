@@ -2,7 +2,7 @@
 
 // 加盟店別発注詳細画面
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Package, ChevronLeft, MapPin, Calendar, CreditCard, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,11 +18,13 @@ import { useParams } from "next/navigation";
 import { Order, OrderItem } from "@/types";
 
 export default function OrderDetailPage() {
-  const { id } = useParams();
+  const params = useParams();
+  const id = typeof params.id === "string" ? params.id : undefined;
   const [order, setOrder] = useState<Order & { items: OrderItem[] } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchOrderDetail = async () => {
+  const fetchOrderDetail = useCallback(async () => {
+    if (!id) return;
     try {
       // 注文詳細API（バックエンド未実装の場合は新規作成が必要）
       const data = await apiGet<Order & { items: OrderItem[] }>(`/api/orders/${id}`);
@@ -32,11 +34,13 @@ export default function OrderDetailPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
-    if (id) fetchOrderDetail();
-  }, [id]);
+    if (id) {
+      fetchOrderDetail();
+    }
+  }, [id, fetchOrderDetail]);
 
   if (isLoading) return (
     <div className="space-y-4">

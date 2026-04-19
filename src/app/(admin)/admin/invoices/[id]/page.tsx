@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useCallback } from "react";
 import { 
   FileText, 
   ArrowLeft, 
@@ -47,7 +47,7 @@ export default function AdminInvoiceDetailPage({ params }: { params: Promise<{ i
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  const fetchInvoice = async () => {
+  const fetchInvoice = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = await apiGet<any>(`/api/admin/invoices/${id}`);
@@ -58,11 +58,11 @@ export default function AdminInvoiceDetailPage({ params }: { params: Promise<{ i
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
     fetchInvoice();
-  }, [id]);
+  }, [fetchInvoice]);
 
   const handleUpdateStatus = async (newStatus: string) => {
     setIsUpdating(true);

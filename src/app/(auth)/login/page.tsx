@@ -37,9 +37,9 @@ export default function LoginPage() {
   useEffect(() => {
     if (!isLoading && user) {
       if (role === "admin") {
-        window.location.href = "/admin/dashboard";
+        window.location.assign("/admin/dashboard");
       } else if (role === "franchise") {
-        window.location.href = "/catalog";
+        window.location.assign("/catalog");
       } else {
         // ロールが設定されていない場合（Google ログイン後の未登録など）
         toast.error("このアカウントにはアクセス権限がありません。管理者にお問い合わせください。");
@@ -56,9 +56,9 @@ export default function LoginPage() {
 
       // フルページ遷移でセッションCookieの確実な送信とルーターキャッシュ回避
       if (userRole === "admin") {
-        window.location.href = "/admin/dashboard";
+        window.location.assign("/admin/dashboard");
       } else if (userRole === "franchise") {
-        window.location.href = "/catalog";
+        window.location.assign("/catalog");
       } else {
         toast.error("このアカウントにはアクセス権限がありません。管理者にお問い合わせください。");
       }
@@ -84,9 +84,9 @@ export default function LoginPage() {
       const userRole = tokenResult.claims["role"] as string | undefined;
 
       if (userRole === "admin") {
-        window.location.href = "/admin/dashboard";
+        window.location.assign("/admin/dashboard");
       } else if (userRole === "franchise") {
-        window.location.href = "/catalog";
+        window.location.assign("/catalog");
       } else {
         toast.error("このアカウントにはアクセス権限がありません。管理者にお問い合わせください。");
       }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useCallback } from "react";
 import { 
   FileText, 
   ArrowLeft, 
@@ -36,7 +36,7 @@ export default function FranchiseInvoiceDetailPage({ params }: { params: Promise
   const [invoice, setInvoice] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchInvoice = async () => {
+  const fetchInvoice = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = await apiGet<any>(`/api/franchise/invoices/${id}`);
@@ -47,11 +47,11 @@ export default function FranchiseInvoiceDetailPage({ params }: { params: Promise
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
     fetchInvoice();
-  }, [id]);
+  }, [fetchInvoice]);
 
   const statusMap: Record<string, { label: string; color: string; icon: any }> = {
     issued: { label: "発行済", color: "bg-blue-50 text-blue-700 border-blue-200", icon: FileText },

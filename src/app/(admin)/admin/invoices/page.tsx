@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { 
   FileText, 
   Search, 
@@ -52,7 +52,7 @@ export default function AdminInvoicesPage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   });
 
-  const fetchInvoices = async () => {
+  const fetchInvoices = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = await apiGet<any[]>(`/api/admin/invoices?yearMonth=${yearMonth}&status=${statusFilter}`);
@@ -63,11 +63,11 @@ export default function AdminInvoicesPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [yearMonth, statusFilter]);
 
   useEffect(() => {
     fetchInvoices();
-  }, [yearMonth, statusFilter]);
+  }, [fetchInvoices]);
 
   const handleGenerateInvoices = async () => {
     if (!confirm(`${yearMonth} 分の請求書を一括生成しますか？`)) return;

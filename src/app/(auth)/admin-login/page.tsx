@@ -35,7 +35,7 @@ export default function AdminLoginPage() {
 
   useEffect(() => {
     if (!isLoading && user && role === "admin") {
-      window.location.href = "/admin/dashboard";
+      window.location.assign("/admin/dashboard");
     }
   }, [user, role, isLoading, router]);
 
@@ -47,7 +47,7 @@ export default function AdminLoginPage() {
 
       if (userRole === "admin") {
         // フルページ遷移でセッションCookieの確実な送信とルーターキャッシュ回避
-        window.location.href = "/admin/dashboard";
+        window.location.assign("/admin/dashboard");
       } else {
         toast.error("管理者権限がありません。");
       }

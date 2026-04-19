@@ -1,7 +1,7 @@
 "use client";
 
 // 管理者向け発注詳細画面
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useCallback } from "react";
 import { 
   ArrowLeft, 
   Package, 
@@ -78,7 +78,7 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  const fetchOrderDetail = async () => {
+  const fetchOrderDetail = useCallback(async () => {
     try {
       setIsLoading(true);
       const data = await apiGet<OrderDetail>(`/api/admin/orders/${id}`);
@@ -89,11 +89,11 @@ export default function AdminOrderDetailPage({ params }: { params: Promise<{ id:
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
     fetchOrderDetail();
-  }, [id]);
+  }, [fetchOrderDetail]);
 
   const handleStatusChange = async (newStatus: string | null) => {
     if (!newStatus) return;

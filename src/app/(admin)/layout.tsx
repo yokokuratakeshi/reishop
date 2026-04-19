@@ -69,7 +69,7 @@ export default function AdminLayout({
             onClick={async () => {
               const { logout } = await import("@/lib/firebase/auth");
               await logout();
-              window.location.href = "/login";
+              window.location.assign("/login");
             }}
             className="flex items-center w-full px-3 py-2 text-sm text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-lg transition-colors"
           >
@@ -87,7 +87,7 @@ export default function AdminLayout({
               onClick={async () => {
                 const { logout } = await import("@/lib/firebase/auth");
                 await logout();
-                window.location.href = "/login";
+                window.location.assign("/login");
               }}
               className="p-2 rounded-full text-muted-foreground hover:bg-muted transition-colors"
               title="ログアウト"

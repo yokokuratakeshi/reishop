@@ -94,7 +94,7 @@ export default function SetupPage() {
 
       // カタログページへリダイレクト（フルページ遷移でセッションCookieを確実に送信）
       setTimeout(() => {
-        window.location.href = "/catalog";
+        window.location.assign("/catalog");
       }, 1500);
     } catch {
       toast.error("アカウント作成に失敗しました。もう一度お試しください。");
