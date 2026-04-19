@@ -17,6 +17,7 @@ const updateFranchiseSchema = z.object({
   is_active: z.boolean().optional(),
   email: z.string().email().optional().nullable(),
   password: z.string().min(6).optional().nullable(),
+  status: z.enum(["pending", "approved"]).optional(),
 });
 
 export async function PUT(

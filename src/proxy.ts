@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 // 保護するルートの定義
 const ADMIN_ROUTES = ["/admin"];
 const FRANCHISE_ROUTES = ["/catalog", "/cart", "/history", "/orders", "/invoices", "/manual"];
-const AUTH_ROUTES = ["/login", "/admin-login", "/admin-register"];
+const AUTH_ROUTES = ["/login", "/admin-login", "/admin-register", "/franchise-register"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

@@ -113,20 +113,26 @@ export default function FranchisesPage() {
 
   const onSubmit = async (data: FranchiseForm) => {
     const stage = stages.find((s) => s.id === data.stage_id);
-    const payload = { 
-      ...data, 
+    const isApprovingPending = editingFranchise?.status === "pending";
+    const payload: Record<string, unknown> = {
+      ...data,
       stage_name: stage?.name || "",
       // 空文字の場合は null として送信
       email: data.email || null,
       password: data.password || null,
     };
 
+    // 承認待ち加盟店を編集保存する場合は approved に昇格させる
+    if (isApprovingPending) {
+      payload.status = "approved";
+    }
+
     try {
       if (editingFranchise) {
         await apiPut(`/api/admin/franchises/${editingFranchise.id}`, payload);
-        toast.success("加盟店情報を更新しました");
+        toast.success(isApprovingPending ? "加盟店を承認しました" : "加盟店情報を更新しました");
       } else {
-        const res = await apiPost<any>("/api/admin/franchises", payload);
+        const res = await apiPost<{ warning?: string }>("/api/admin/franchises", payload);
         if (res.warning) {
           toast.warning(res.warning);
         } else if (data.email) {
@@ -267,20 +273,40 @@ export default function FranchisesPage() {
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-foreground">{f.name}</span>
                       <span className="text-muted-foreground text-xs">({f.franchise_code})</span>
+                      {f.status === "pending" && (
+                        <Badge className="bg-amber-500 hover:bg-amber-500 text-white text-[10px] h-5">
+                          承認待ち
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="secondary" className="text-[10px] h-5">
-                        {f.stage_name}
-                      </Badge>
+                      {f.stage_name ? (
+                        <Badge variant="secondary" className="text-[10px] h-5">
+                          {f.stage_name}
+                        </Badge>
+                      ) : (
+                        <span className="text-amber-600 text-[10px]">ステージ未設定</span>
+                      )}
                       {f.area && <span className="text-muted-foreground text-[10px]">{f.area}</span>}
                       {f.email && <span className="text-muted-foreground text-[10px] ml-1">{f.email}</span>}
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick={() => openEditDialog(f)}>
-                    <Pencil className="w-4 h-4" />
-                  </Button>
+                  {f.status === "pending" ? (
+                    <Button
+                      size="sm"
+                      className="bg-amber-500 hover:bg-amber-600 text-white"
+                      onClick={() => openEditDialog(f)}
+                    >
+                      <ShieldCheck className="w-4 h-4 mr-1" />
+                      承認する
+                    </Button>
+                  ) : (
+                    <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick={() => openEditDialog(f)}>
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                  )}
                   <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive" onClick={() => handleDelete(f)}>
                     <Trash2 className="w-4 h-4" />
                   </Button>

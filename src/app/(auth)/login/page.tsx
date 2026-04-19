@@ -268,9 +268,17 @@ export default function LoginPage() {
           </CardContent>
         </Card>
 
-        <p className="text-center text-xs text-muted-foreground mt-6">
-          ログイン情報は本部スタッフよりご案内いたします
-        </p>
+        <div className="text-center mt-6 space-y-2">
+          <p className="text-xs text-muted-foreground">
+            はじめての方はこちらから新規登録してください
+          </p>
+          <a
+            href="/franchise-register"
+            className="inline-block text-sm font-semibold text-primary hover:underline"
+          >
+            加盟店の新規登録はこちら
+          </a>
+        </div>
       </div>
     </div>
   );

@@ -31,6 +31,11 @@ export interface AppUser {
 // ----------------------
 // 加盟店
 // ----------------------
+// 加盟店の承認ステータス
+// pending: セルフ登録直後。本部がステージ割り当て＋承認するまで発注不可
+// approved: 本部承認済み。通常の発注が可能
+export type FranchiseStatus = "pending" | "approved";
+
 export interface Franchise {
   id: string;
   franchise_code: string;
@@ -51,6 +56,7 @@ export interface Franchise {
   email: string | null;
   auth_uid?: string | null;
   is_active: boolean;
+  status?: FranchiseStatus; // 旧データは undefined。未定義は approved として扱う
   created_at: Timestamp;
   updated_at: Timestamp;
 }
