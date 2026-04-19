@@ -101,6 +101,7 @@ export async function POST(
           sku_code: generateSkuCode(productId, 0),
           attribute_values: {},
           is_active: true,
+          sort_order: 0,
           created_at: FieldValue.serverTimestamp(),
           updated_at: FieldValue.serverTimestamp(),
         });
@@ -137,6 +138,7 @@ export async function POST(
         sku_code: skuCode,
         attribute_values: combination,
         is_active: true,
+        sort_order: startIndex + i,
         created_at: FieldValue.serverTimestamp(),
         updated_at: FieldValue.serverTimestamp(),
       });

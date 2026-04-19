@@ -115,6 +115,7 @@ export interface ProductVariant {
   sku_code: string;
   attribute_values: Record<string, string>; // { "カラー": "白", "サイズ": "M" }
   is_active: boolean;
+  sort_order?: number; // 表示順（ドラッグ＆ドロップで並び替え可能）
   created_at: Timestamp;
   updated_at: Timestamp;
   prices?: VariantPrice[]; // フロント側で結合する場合

@@ -68,14 +68,23 @@ export async function GET(
     }));
 
     // バリアント + 価格を結合
-    const variants = variantsSnapshot.docs.map((varDoc, idx) => ({
-      id: varDoc.id,
-      ...varDoc.data(),
-      prices: priceResults[idx].docs.map((priceDoc) => ({
-        id: priceDoc.id,
-        ...priceDoc.data(),
-      })),
-    }));
+    // sort_order が未設定のバリアント（既存データ）は末尾に並ぶよう大きな値をフォールバック
+    const variants = variantsSnapshot.docs
+      .map((varDoc, idx) => ({
+        id: varDoc.id,
+        ...varDoc.data(),
+        prices: priceResults[idx].docs.map((priceDoc) => ({
+          id: priceDoc.id,
+          ...priceDoc.data(),
+        })),
+      }))
+      .sort((a, b) => {
+        const aRec = a as unknown as { sort_order?: number };
+        const bRec = b as unknown as { sort_order?: number };
+        const aOrder = typeof aRec.sort_order === "number" ? aRec.sort_order : Number.MAX_SAFE_INTEGER;
+        const bOrder = typeof bRec.sort_order === "number" ? bRec.sort_order : Number.MAX_SAFE_INTEGER;
+        return aOrder - bOrder;
+      });
 
     return successResponse({
       id: productDoc.id,

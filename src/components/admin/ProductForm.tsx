@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Trash2, Zap, ChevronLeft, Pencil, Check, X, Eye, EyeOff, CopyCheck } from "lucide-react";
+import { Plus, Trash2, Zap, ChevronLeft, Pencil, Check, X, Eye, EyeOff, CopyCheck, GripVertical } from "lucide-react";
 import Link from "next/link";
 import { Category, Stage, ProductVariant, VariantPrice } from "@/types";
 import { apiGet, apiPost, apiPut, apiPatch } from "@/lib/utils/apiClient";
@@ -28,6 +28,23 @@ import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { useForm } from "react-hook-form";
 import ImageUpload from "./ImageUpload";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -57,6 +74,121 @@ interface ProductFormPageProps {
   productId?: string; // 編集時のみ
 }
 
+// === ソート可能なバリアント行 ===
+// tr要素に useSortable を適用しドラッグ＆ドロップで並び替え可能にする。
+function SortableVariantRow({
+  variant,
+  stages,
+  prices,
+  updateVariant,
+  updatePrice,
+  removeVariant,
+}: {
+  variant: ProductVariant;
+  stages: Stage[];
+  prices: Record<string, Record<string, number>>;
+  updateVariant: (variantId: string, data: { sku_code?: string; is_active?: boolean }) => void;
+  updatePrice: (variantId: string, stageId: string, value: number) => void;
+  removeVariant: (variantId: string) => void;
+}) {
+  const {
+    attributes: dragAttributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: variant.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "border-b border-border last:border-0",
+        variant.is_active === false && "opacity-50"
+      )}
+    >
+      <td className="py-2 pr-4">
+        <div className="flex items-center gap-2">
+          {/* ドラッグハンドル */}
+          <button
+            type="button"
+            className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground hover:text-foreground"
+            title="ドラッグして並び替え"
+            {...dragAttributes}
+            {...listeners}
+          >
+            <GripVertical className="w-4 h-4" />
+          </button>
+          <span className="text-foreground">
+            {Object.keys(variant.attribute_values ?? {}).length > 0
+              ? formatAttributeValues(variant.attribute_values)
+              : "（バリアントなし）"}
+          </span>
+        </div>
+        <div className="flex items-center gap-1 mt-1 pl-6">
+          <Input
+            defaultValue={variant.sku_code}
+            className="h-6 text-xs w-32 px-1.5 text-muted-foreground"
+            onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
+            onBlur={(e) => {
+              const newSku = e.target.value.trim();
+              if (newSku && newSku !== variant.sku_code) {
+                updateVariant(variant.id, { sku_code: newSku });
+              }
+            }}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "h-6 w-6 p-0",
+              variant.is_active === false
+                ? "text-muted-foreground hover:text-green-600"
+                : "text-green-600 hover:text-muted-foreground"
+            )}
+            onClick={() => updateVariant(variant.id, { is_active: !(variant.is_active ?? true) })}
+            title={variant.is_active === false ? "有効にする" : "無効にする"}
+          >
+            {variant.is_active === false ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+          </Button>
+        </div>
+      </td>
+      {stages.map((stage) => (
+        <td key={stage.id} className="py-2 px-3 text-center">
+          <Input
+            type="number"
+            min={0}
+            placeholder="0"
+            className="w-24 mx-auto text-center tabular-nums"
+            value={prices[variant.id]?.[stage.id] ?? ""}
+            onChange={(e) => updatePrice(variant.id, stage.id, Number(e.target.value))}
+            onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
+          />
+        </td>
+      ))}
+      <td className="py-2 pl-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground hover:text-destructive h-8 w-8 p-0"
+          onClick={() => removeVariant(variant.id)}
+          title="バリアントを削除"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </Button>
+      </td>
+    </tr>
+  );
+}
+
 export default function ProductFormPage({ productId }: ProductFormPageProps) {
   const router = useRouter();
   const isEditing = !!productId;
@@ -72,6 +204,35 @@ export default function ProductFormPage({ productId }: ProductFormPageProps) {
   // 価格一括適用用の状態
   const [bulkPrice, setBulkPrice] = useState<string>("");
   const [bulkTargetStages, setBulkTargetStages] = useState<Set<string>>(new Set());
+
+  // ドラッグ＆ドロップ用センサー
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  // バリアントの並び替え（ドラッグ終了時）
+  const handleVariantDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !savedProductId) return;
+
+    const oldIndex = variants.findIndex((v) => v.id === active.id);
+    const newIndex = variants.findIndex((v) => v.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(variants, oldIndex, newIndex);
+    setVariants(reordered); // 楽観的に即反映
+
+    const payload = reordered.map((v, i) => ({ id: v.id, sort_order: i }));
+    try {
+      await apiPatch(`/api/admin/products/${savedProductId}/variants/reorder`, payload);
+      toast.success("並び順を更新しました");
+    } catch {
+      toast.error("並び順の更新に失敗しました");
+      // 失敗時はロールバック
+      setVariants(variants);
+    }
+  };
 
   const {
     register,
@@ -678,74 +839,30 @@ export default function ProductFormPage({ productId }: ProductFormPageProps) {
                     <th className="w-10" />
                   </tr>
                 </thead>
-                <tbody>
-                  {variants.map((variant) => (
-                    <tr key={variant.id} className={cn("border-b border-border last:border-0", variant.is_active === false && "opacity-50")}>
-                      <td className="py-2 pr-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-foreground">
-                            {Object.keys(variant.attribute_values ?? {}).length > 0
-                              ? formatAttributeValues(variant.attribute_values)
-                              : "（バリアントなし）"}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1 mt-1">
-                          <Input
-                            defaultValue={variant.sku_code}
-                            className="h-6 text-xs w-32 px-1.5 text-muted-foreground"
-                            onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
-                            onBlur={(e) => {
-                              const newSku = e.target.value.trim();
-                              if (newSku && newSku !== variant.sku_code) {
-                                updateVariant(variant.id, { sku_code: newSku });
-                              }
-                            }}
-                          />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className={cn(
-                              "h-6 w-6 p-0",
-                              variant.is_active === false
-                                ? "text-muted-foreground hover:text-green-600"
-                                : "text-green-600 hover:text-muted-foreground"
-                            )}
-                            onClick={() => updateVariant(variant.id, { is_active: !(variant.is_active ?? true) })}
-                            title={variant.is_active === false ? "有効にする" : "無効にする"}
-                          >
-                            {variant.is_active === false ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                          </Button>
-                        </div>
-                      </td>
-                      {stages.map((stage) => (
-                        <td key={stage.id} className="py-2 px-3 text-center">
-                          <Input
-                            type="number"
-                            min={0}
-                            placeholder="0"
-                            className="w-24 mx-auto text-center tabular-nums"
-                            value={prices[variant.id]?.[stage.id] ?? ""}
-                            onChange={(e) =>
-                              updatePrice(variant.id, stage.id, Number(e.target.value))
-                            }
-                            onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
-                          />
-                        </td>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleVariantDragEnd}
+                >
+                  <SortableContext
+                    items={variants.map((v) => v.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <tbody>
+                      {variants.map((variant) => (
+                        <SortableVariantRow
+                          key={variant.id}
+                          variant={variant}
+                          stages={stages}
+                          prices={prices}
+                          updateVariant={updateVariant}
+                          updatePrice={updatePrice}
+                          removeVariant={removeVariant}
+                        />
                       ))}
-                      <td className="py-2 pl-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-muted-foreground hover:text-destructive h-8 w-8 p-0"
-                          onClick={() => removeVariant(variant.id)}
-                          title="バリアントを削除"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
+                    </tbody>
+                  </SortableContext>
+                </DndContext>
               </table>
             </div>
 
