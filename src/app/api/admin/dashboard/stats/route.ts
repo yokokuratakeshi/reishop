@@ -23,10 +23,10 @@ export async function GET(request: NextRequest) {
       ordersForStatsSnap,
       allOrdersSnap,
     ] = await Promise.all([
-      // 加盟店カウント（軽量：ドキュメントIDのみ）
-      adminDb.collection(COLLECTIONS.FRANCHISES).select().get(),
-      // 商品カウント（軽量：ドキュメントIDのみ）
-      adminDb.collection(COLLECTIONS.PRODUCTS).select().get(),
+      // 加盟店カウント（軽量：is_activeのみ取得して後でフィルタ）
+      adminDb.collection(COLLECTIONS.FRANCHISES).select("is_active").get(),
+      // 商品カウント（軽量：is_activeのみ取得して後でフィルタ）
+      adminDb.collection(COLLECTIONS.PRODUCTS).select("is_active").get(),
       // 直近の注文5件（表示用）
       adminDb.collection(COLLECTIONS.ORDERS).orderBy("created_at", "desc").limit(5).get(),
       // 直近6ヶ月の注文（統計用）
@@ -123,8 +123,8 @@ export async function GET(request: NextRequest) {
     return successResponse({
       stats: {
         totalOrders: allOrdersSnap.size,
-        totalFranchises: franchisesSnap.size,
-        totalProducts: productsSnap.size,
+        totalFranchises: franchisesSnap.docs.filter(d => d.data().is_active !== false).length,
+        totalProducts: productsSnap.docs.filter(d => d.data().is_active !== false).length,
         totalSales,
         pendingOrders,
         salesByMonth,
