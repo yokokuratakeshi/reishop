@@ -39,7 +39,7 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
-  verticalListSortingStrategy,
+  rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
@@ -66,6 +66,7 @@ function SortableProductCard({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : "auto",
   };
 
   return (
@@ -212,7 +213,7 @@ function CategoryGroupDnD({
       {/* 商品グリッド */}
       {!collapsed && (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={products.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+          <SortableContext items={products.map((p) => p.id)} strategy={rectSortingStrategy}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ml-6">
               {products.map((product) => (
                 <SortableProductCard
