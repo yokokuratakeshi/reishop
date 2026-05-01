@@ -196,8 +196,8 @@ export default function FranchisesPage() {
   );
 
   return (
-    <div className="p-6 page-enter">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 sm:p-6 page-enter">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>
             加盟店管理
@@ -206,7 +206,7 @@ export default function FranchisesPage() {
             加盟店のアカウントとステージ紐付けを管理します
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <CsvImportButton
             title="加盟店CSVインポート"
             description="加盟店情報を一括で登録・更新します。IDが一致するデータは更新され、IDがないデータは新規登録されます。"
@@ -259,8 +259,8 @@ export default function FranchisesPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredFranchises.map((f: any) => (
             <Card key={f.id} className="border-border shadow-sm hover:shadow-md transition-shadow">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div className="flex items-center gap-4">
+              <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-start sm:items-center gap-4">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center relative">
                     <Store className="w-5 h-5 text-primary" />
                     {f.auth_uid && (
@@ -292,7 +292,7 @@ export default function FranchisesPage() {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center justify-end gap-2 w-full sm:w-auto shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50">
                   {f.status === "pending" ? (
                     <Button
                       size="sm"
@@ -324,7 +324,7 @@ export default function FranchisesPage() {
             <DialogTitle>{editingFranchise ? "加盟店を編集" : "加盟店を追加"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2" onKeyDown={(e) => { if (e.key === "Enter" && (e.target as HTMLElement).tagName !== "BUTTON") e.preventDefault(); }}>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="f-code">店舗コード *</Label>
                 <Input id="f-code" placeholder="例: FC001" {...register("franchise_code")} />
@@ -337,7 +337,7 @@ export default function FranchisesPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>ステージ *</Label>
                 <Select
