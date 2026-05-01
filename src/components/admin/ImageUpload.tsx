@@ -37,9 +37,15 @@ export default function ImageUpload({ value, onChange, productId }: ImageUploadP
       const url = await uploadProductImage(productId, file);
       onChange(url);
       toast.success("画像をアップロードしました");
-    } catch (error) {
-      console.error(error);
-      toast.error("画像のアップロードに失敗しました");
+    } catch (error: any) {
+      console.error("Upload error details:", error);
+      const errorMessage = error?.message || "不明なエラーが発生しました";
+      
+      if (errorMessage.includes("unauthorized") || errorMessage.includes("permission")) {
+        toast.error("権限がありません（管理者アカウントか確認してください）");
+      } else {
+        toast.error(`アップロード失敗: ${errorMessage}`);
+      }
     } finally {
       setIsUploading(false);
     }
