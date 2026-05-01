@@ -89,7 +89,7 @@ function SortableProductCard({
                 alt={product.name}
                 width={64}
                 height={64}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain p-1"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
@@ -480,7 +480,7 @@ export default function ProductsPage() {
                         alt={product.name}
                         width={64}
                         height={64}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain p-1"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">

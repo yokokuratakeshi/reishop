@@ -65,7 +65,7 @@ export default function ImageUpload({ value, onChange, productId }: ImageUploadP
             <img
               src={value}
               alt="Product"
-              className="w-full h-full object-cover transition-transform group-hover:scale-110"
+              className="w-full h-full object-contain p-2 transition-transform group-hover:scale-110"
             />
             <button
               onClick={removeImage}

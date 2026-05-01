@@ -200,9 +200,9 @@ function ProductCard({ product, onAddToCart }: { product: Product, onAddToCart: 
     <Card className="overflow-hidden border-none shadow-sm bg-card hover:shadow-md transition-shadow rounded-2xl">
       <div className="flex">
         {/* 画像領域 */}
-        <div className="w-28 min-h-28 relative bg-muted shrink-0">
+        <div className="w-28 h-28 relative bg-muted shrink-0">
           {product.image_url ? (
-            <Image src={product.image_url} alt={product.name} fill className="object-cover" />
+            <Image src={product.image_url} alt={product.name} fill className="object-contain p-1.5" />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
               <Package className="w-8 h-8" />
