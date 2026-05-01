@@ -21,6 +21,7 @@ import { Product, ProductVariant } from "@/types";
 import { apiGet } from "@/lib/utils/apiClient";
 import { formatCurrency, formatAttributeValues } from "@/lib/utils/format";
 import { useCart } from "@/lib/store/useCart";
+import { CATEGORY_SORT_ORDER } from "@/lib/constants";
 import Image from "next/image";
 
 export default function CatalogPage() {
@@ -37,12 +38,19 @@ export default function CatalogPage() {
       const data = await apiGet<Product[]>("/api/products/catalog");
       setProducts(data);
       
-      // カテゴリ抽出
+      // カテゴリ抽出とソート
       const cats = Array.from(new Set(data.map(p => p.category_id)))
         .map(id => ({
           id,
           name: data.find(p => p.category_id === id)?.category_name || "その他"
-        }));
+        }))
+        .sort((a, b) => {
+          const indexA = CATEGORY_SORT_ORDER.indexOf(a.name);
+          const indexB = CATEGORY_SORT_ORDER.indexOf(b.name);
+          const posA = indexA === -1 ? 999 : indexA;
+          const posB = indexB === -1 ? 999 : indexB;
+          return posA - posB;
+        });
       setCategories(cats);
     } catch {
       toast.error("カタログの取得に失敗しました");
