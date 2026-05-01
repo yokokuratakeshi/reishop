@@ -339,14 +339,17 @@ export default function ProductsPage() {
 
   // グループ内並べ替えハンドラ
   const handleGroupReorder = async (categoryId: string, newProducts: Product[]) => {
+    // 並べ替え後のインデックスでローカルの sort_order を更新
+    const updatedNewProducts = newProducts.map((p, i) => ({ ...p, sort_order: i }));
+
     // ローカル state を即時更新
     setProducts((prev) => {
       const otherProducts = prev.filter((p) => p.category_id !== categoryId);
-      return [...otherProducts, ...newProducts];
+      return [...otherProducts, ...updatedNewProducts];
     });
 
     // API に sort_order を保存
-    const reorderData = newProducts.map((p, i) => ({ id: p.id, sort_order: i }));
+    const reorderData = updatedNewProducts.map((p) => ({ id: p.id, sort_order: p.sort_order }));
     try {
       await apiPatch("/api/admin/products/reorder", reorderData);
     } catch {
